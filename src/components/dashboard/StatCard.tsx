@@ -18,7 +18,7 @@ export function StatCard({
   icon: Icon,
   description,
   className,
-  iconColor = "text-gym-blue",
+  iconColor = "text-fitgym-white",
 }: StatCardProps) {
   return (
     <Card className={cn("overflow-hidden", className)}>

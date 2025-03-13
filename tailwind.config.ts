@@ -63,13 +63,12 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				gym: {
-					blue: '#3B82F6',
-					green: '#10B981',
-					purple: '#8B5CF6',
-					'blue-dark': '#2563EB',
-					'green-dark': '#059669',
-					'purple-dark': '#7C3AED',
+				fitgym: {
+					black: '#000000',
+					white: '#FFFFFF',
+					gray: '#222222',
+					'light-gray': '#F1F1F1',
+					'dark-gray': '#333333',
 				}
 			},
 			borderRadius: {

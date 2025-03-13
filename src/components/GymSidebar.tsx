@@ -45,8 +45,8 @@ export function GymSidebar() {
     <Sidebar className="border-r" data-testid="sidebar">
       <SidebarHeader className="flex h-16 items-center px-4 border-b">
         <Link to="/" className="flex items-center gap-2">
-          <Dumbbell className="h-6 w-6 text-gym-green" />
-          <span className="font-bold text-lg">GymOasis</span>
+          <Dumbbell className="h-6 w-6 text-fitgym-white" />
+          <span className="font-bold text-lg text-fitgym-white">FitGym</span>
         </Link>
         <div className="ml-auto flex items-center gap-1 md:hidden">
           <SidebarTrigger>
