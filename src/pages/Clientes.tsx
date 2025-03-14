@@ -190,7 +190,12 @@ export default function Clientes() {
       // Agregar nuevo cliente
       const nuevoCliente: Cliente = {
         id: Math.random().toString(36).substr(2, 9),
-        ...values,
+        nombre: values.nombre,
+        dni: values.dni,
+        email: values.email,
+        telefono: values.telefono,
+        fechaInicio: values.fechaInicio,
+        fechaFin: values.fechaFin,
         membresia: "activa",
         asistencias: 0,
       };
