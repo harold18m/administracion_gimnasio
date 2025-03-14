@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Dumbbell, 
@@ -10,7 +10,8 @@ import {
   Settings, 
   Bot,
   Menu,
-  LogOut
+  LogOut,
+  Fingerprint
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ import {
   SidebarHeader,
   SidebarTrigger
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/App';
 
 type SidebarItem = {
   icon: React.ElementType;
@@ -33,6 +35,7 @@ const sidebarItems: SidebarItem[] = [
   { icon: Dumbbell, label: 'Ejercicios', href: '/ejercicios' },
   { icon: MessageSquare, label: 'WhatsApp', href: '/whatsapp' },
   { icon: Users, label: 'Clientes', href: '/clientes' },
+  { icon: Fingerprint, label: 'Asistencia', href: '/asistencia' },
   { icon: Calendar, label: 'Calendario', href: '/calendario' },
   { icon: Bot, label: 'ChatBot', href: '/chatbot' },
   { icon: Settings, label: 'Configuración', href: '/configuracion' },
@@ -40,6 +43,13 @@ const sidebarItems: SidebarItem[] = [
 
 export function GymSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   
   return (
     <Sidebar className="border-r" data-testid="sidebar">
@@ -73,7 +83,11 @@ export function GymSidebar() {
         </div>
       </SidebarContent>
       <SidebarFooter className="p-2 border-t">
-        <Button variant="ghost" className="w-full justify-start gap-2 text-red-500 hover:text-red-700">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-2 text-red-500 hover:text-red-700"
+          onClick={handleLogout}
+        >
           <LogOut className="h-5 w-5" />
           <span>Cerrar Sesión</span>
         </Button>
