@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Dumbbell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/App";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Correo electrónico inválido" }),
@@ -20,6 +21,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -35,15 +37,16 @@ export default function Login() {
       // Aquí se implementaría la autenticación real con Supabase o Firebase
       console.log("Login data:", values);
       
-      // Simulación de inicio de sesión exitoso
-      setTimeout(() => {
-        setIsLoading(false);
-        toast({
-          title: "Inicio de sesión exitoso",
-          description: "Bienvenido a FitGym",
-        });
-        navigate("/");
-      }, 1000);
+      // Llamar a la función login del contexto
+      login();
+      
+      // Mostrar mensaje de éxito y redirigir
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Bienvenido a FitGym",
+      });
+      
+      navigate("/");
     } catch (error) {
       setIsLoading(false);
       toast({
@@ -51,6 +54,8 @@ export default function Login() {
         title: "Error al iniciar sesión",
         description: "Credenciales incorrectas",
       });
+    } finally {
+      setIsLoading(false);
     }
   }
 
