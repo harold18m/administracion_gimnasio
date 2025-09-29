@@ -17,9 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Edit, Trash2 } from "lucide-react";
-import { Cliente, estadoStyle } from "./types";
+import { Cliente } from "./types";
 
 interface ClientesTableProps {
   clientes: Cliente[];
@@ -46,7 +46,7 @@ export function ClientesTable({
         <div className="relative mt-4">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, DNI o email..."
+            placeholder="Buscar por nombre, teléfono o email..."
             className="pl-8"
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
@@ -58,18 +58,16 @@ export function ClientesTable({
           <TableHeader>
             <TableRow>
               <TableHead>Cliente</TableHead>
-              <TableHead>DNI</TableHead>
               <TableHead>Contacto</TableHead>
+              <TableHead>Fecha Nacimiento</TableHead>
               <TableHead>Membresía</TableHead>
-              <TableHead>Período</TableHead>
-              <TableHead>Asistencias</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {clientes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
+                <TableCell colSpan={5} className="text-center py-4">
                   No se encontraron clientes
                 </TableCell>
               </TableRow>
@@ -79,7 +77,6 @@ export function ClientesTable({
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar>
-                        <AvatarImage src={cliente.avatarUrl} />
                         <AvatarFallback>
                           {cliente.nombre
                             .split(" ")
@@ -92,7 +89,6 @@ export function ClientesTable({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{cliente.dni}</TableCell>
                   <TableCell>
                     <div>
                       <p>{cliente.email}</p>
@@ -102,21 +98,16 @@ export function ClientesTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={estadoStyle[cliente.membresia]}>
-                      {cliente.membresia}
-                    </Badge>
+                    {cliente.fecha_nacimiento ? 
+                      new Date(cliente.fecha_nacimiento).toLocaleDateString() : 
+                      'No especificada'
+                    }
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <p className="text-sm">
-                        Inicio: {new Date(cliente.fechaInicio).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm">
-                        Fin: {new Date(cliente.fechaFin).toLocaleDateString()}
-                      </p>
-                    </div>
+                    <Badge variant="default">
+                      {cliente.membresia_id ? 'Con membresía' : 'Sin membresía'}
+                    </Badge>
                   </TableCell>
-                  <TableCell>{cliente.asistencias}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button

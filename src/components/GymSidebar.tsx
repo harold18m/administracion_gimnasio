@@ -11,7 +11,8 @@ import {
   Bot,
   Menu,
   LogOut,
-  Fingerprint
+  Fingerprint,
+  CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,10 +33,11 @@ type SidebarItem = {
 
 const sidebarItems: SidebarItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+  { icon: Fingerprint, label: 'Asistencia', href: '/asistencia' },
+  { icon: Users, label: 'Clientes', href: '/clientes' },
+  { icon: CreditCard, label: 'Membresías', href: '/membresias' },
   { icon: Dumbbell, label: 'Ejercicios', href: '/ejercicios' },
   { icon: MessageSquare, label: 'WhatsApp', href: '/whatsapp' },
-  { icon: Users, label: 'Clientes', href: '/clientes' },
-  { icon: Fingerprint, label: 'Asistencia', href: '/asistencia' },
   { icon: Calendar, label: 'Calendario', href: '/calendario' },
   { icon: Bot, label: 'ChatBot', href: '/chatbot' },
   { icon: Settings, label: 'Configuración', href: '/configuracion' },

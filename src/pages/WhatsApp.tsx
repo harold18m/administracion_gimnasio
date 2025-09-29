@@ -1,26 +1,29 @@
 
 import { useState } from "react";
-import {
-  MessageSquare,
-  Send,
-  Users,
-  User,
-  Search,
-  Phone,
-  Video,
-  MoreHorizontal,
-  PaperclipIcon,
-  Image,
-  FileText,
-  Smile,
-  Bot,
-  Dumbbell,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Send, 
+  Search, 
+  Phone, 
+  Video, 
+  MoreHorizontal, 
+  Paperclip, 
+  Smile,
+  Check,
+  CheckCheck,
+  Bot,
+  Settings,
+  Users,
+  MessageSquare,
+  Dumbbell,
+  PaperclipIcon,
+  Image,
+  FileText
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -36,6 +39,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BotConfigPanel } from "@/features/whatsapp/BotConfigPanel";
+import { ClienteBotIntegration } from "@/features/whatsapp/ClienteBotIntegration";
+import { WhatsAppSetupPanel } from "@/features/whatsapp/WhatsAppSetupPanel";
+import { useBotWhatsApp } from "@/features/whatsapp/useBotWhatsApp";
 
 interface Mensaje {
   id: string;
@@ -59,7 +66,6 @@ interface Conversacion {
   noLeidos: number;
 }
 
-// Datos de ejemplo
 const conversacionesIniciales: Conversacion[] = [
   {
     id: "1",
@@ -203,6 +209,8 @@ export default function WhatsApp() {
   const [conversacionActiva, setConversacionActiva] = useState<string | null>("1");
   const [nuevoMensaje, setNuevoMensaje] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [tabActiva, setTabActiva] = useState("conversaciones");
+  const { botConfig, estadisticas, procesarMensaje } = useBotWhatsApp();
   
   // Obtener la conversación activa
   const conversacionActual = conversaciones.find(
@@ -239,286 +247,282 @@ export default function WhatsApp() {
     
     setNuevoMensaje("");
   };
-  
+
+  // Simular respuesta del bot
+  const simularRespuestaBot = (mensaje: string, conversacionId: string) => {
+    if (!botConfig.activo) return;
+
+    const respuesta = procesarMensaje(mensaje, conversacionId);
+    if (respuesta) {
+      setTimeout(() => {
+        const mensajeBot: Mensaje = {
+          id: (Date.now() + 1).toString(),
+          texto: respuesta,
+          remitente: "yo",
+          fecha: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          leido: false,
+        };
+
+        setConversaciones(prev =>
+          prev.map((c) =>
+            c.id === conversacionId
+              ? {
+                  ...c,
+                  mensajes: [...c.mensajes, mensajeBot],
+                }
+              : c
+          )
+        );
+      }, 1000);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">WhatsApp</h2>
+        <h2 className="text-3xl font-bold tracking-tight">WhatsApp Business</h2>
         <p className="text-muted-foreground">
-          Gestiona tus conversaciones con clientes
+          Gestiona las conversaciones con tus clientes y configura el bot automático
         </p>
       </div>
-      
-      <div className="border rounded-lg grid grid-cols-1 md:grid-cols-3 h-[700px]">
-        {/* Lista de conversaciones */}
-        <div className="border-r md:col-span-1 flex flex-col h-full">
-          <div className="p-4 border-b">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar conversaciones..."
-                className="pl-8"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto">
-            {conversacionesFiltradas.map((conv) => (
-              <div
-                key={conv.id}
-                className={`p-4 border-b cursor-pointer hover:bg-muted/50 ${
-                  conv.id === conversacionActiva ? "bg-muted" : ""
-                }`}
-                onClick={() => setConversacionActiva(conv.id)}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="relative">
-                    <Avatar>
-                      <AvatarImage src={conv.cliente.avatar} />
-                      <AvatarFallback>
-                        {conv.cliente.nombre
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div
-                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${
-                        conv.cliente.estado === "online"
-                          ? "bg-green-500"
-                          : conv.cliente.estado === "ausente"
-                          ? "bg-yellow-500"
-                          : "bg-gray-500"
-                      }`}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-sm truncate">
-                        {conv.cliente.nombre}
-                      </h4>
-                      <span className="text-xs text-muted-foreground">
-                        {conv.mensajes[conv.mensajes.length - 1]?.fecha}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conv.mensajes[conv.mensajes.length - 1]?.texto}
-                    </p>
-                  </div>
-                  {conv.noLeidos > 0 && (
-                    <Badge className="bg-green-500 text-white">
-                      {conv.noLeidos}
-                    </Badge>
-                  )}
-                </div>
+
+      <div className="flex h-[800px] bg-white rounded-lg border">
+        {/* Sidebar */}
+        <div className="w-80 border-r border-gray-200 flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Conversaciones</h3>
+              <div className="flex items-center gap-2">
+                {botConfig.activo && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    <Bot className="w-3 h-3 mr-1" />
+                    Bot Activo
+                  </Badge>
+                )}
               </div>
-            ))}
+            </div>
+            
+            {/* Tabs */}
+            <Tabs value={tabActiva} onValueChange={setTabActiva} className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="conversaciones" className="text-xs">
+                  <MessageSquare className="w-4 h-4 mr-1" />
+                  Chats
+                </TabsTrigger>
+                <TabsTrigger value="bot" className="text-xs">
+                  <Bot className="w-4 h-4 mr-1" />
+                  Bot
+                </TabsTrigger>
+                <TabsTrigger value="clientes" className="text-xs">
+                  <Users className="w-4 h-4 mr-1" />
+                  Clientes
+                </TabsTrigger>
+                <TabsTrigger value="api" className="text-xs">
+                  <Settings className="w-4 h-4 mr-1" />
+                  API
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="conversaciones" className="mt-4">
+                {/* Búsqueda */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Buscar conversaciones..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Lista de conversaciones */}
+                <div className="flex-1 overflow-y-auto">
+                  {conversacionesFiltradas.map((conversacion) => (
+                    <div
+                      key={conversacion.id}
+                      onClick={() => setConversacionActiva(conversacion.id)}
+                      className={`p-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
+                        conversacionActiva === conversacion.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <Avatar className="w-12 h-12">
+                          <AvatarImage src={conversacion.cliente.avatar} />
+                          <AvatarFallback>{conversacion.cliente.nombre.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium text-sm truncate">{conversacion.cliente.nombre}</h4>
+                            <span className="text-xs text-gray-500">
+                              {conversacion.mensajes[conversacion.mensajes.length - 1]?.fecha}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 truncate mt-1">
+                            {conversacion.mensajes[conversacion.mensajes.length - 1]?.texto}
+                          </p>
+                          <div className="flex items-center justify-between mt-2">
+                            <Badge variant={conversacion.cliente.estado === 'online' ? 'default' : 'secondary'} className="text-xs">
+                              {conversacion.cliente.estado}
+                            </Badge>
+                            {conversacion.noLeidos > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                {conversacion.noLeidos}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="bot" className="mt-4 h-[600px] overflow-y-auto">
+                <BotConfigPanel />
+              </TabsContent>
+              
+              <TabsContent value="clientes" className="mt-4 h-[600px] overflow-y-auto">
+                <ClienteBotIntegration />
+              </TabsContent>
+              
+              <TabsContent value="api" className="mt-4 h-[600px] overflow-y-auto">
+                <WhatsAppSetupPanel />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
-        
-        {/* Área de chat */}
-        <div className="md:col-span-2 flex flex-col h-full">
+
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col">
           {conversacionActual ? (
             <>
-              <div className="p-3 border-b flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={conversacionActual.cliente.avatar} />
-                    <AvatarFallback>
-                      {conversacionActual.cliente.nombre
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h3 className="font-medium text-sm">
-                      {conversacionActual.cliente.nombre}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {conversacionActual.cliente.estado === "online"
-                        ? "En línea"
-                        : conversacionActual.cliente.ultimaConexion}
-                    </p>
+              {/* Chat Header */}
+              <div className="p-4 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={conversacionActual.cliente.avatar} />
+                      <AvatarFallback>{conversacionActual.cliente.nombre.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium">{conversacionActual.cliente.nombre}</h3>
+                      <p className="text-sm text-gray-500">
+                        {conversacionActual.cliente.estado === 'online' ? 'En línea' : 
+                         conversacionActual.cliente.ultimaConexion || 'Desconectado'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="ghost" size="sm">
+                      <Phone className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <Video className="w-4 h-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem>Ver perfil</DropdownMenuItem>
+                        <DropdownMenuItem>Silenciar</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600">Bloquear</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon">
-                    <Phone className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="icon">
-                    <Video className="h-5 w-5" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Opciones</DropdownMenuLabel>
-                      <DropdownMenuItem>Ver información de contacto</DropdownMenuItem>
-                      <DropdownMenuItem>Silenciar notificaciones</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-500">Bloquear</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
               </div>
-              
-              <div className="flex-1 p-4 overflow-auto space-y-4">
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {conversacionActual.mensajes.map((mensaje) => (
                   <div
                     key={mensaje.id}
-                    className={`flex ${
-                      mensaje.remitente === "yo" ? "justify-end" : "justify-start"
-                    }`}
+                    className={`flex ${mensaje.remitente === 'yo' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-xs sm:max-w-md rounded-lg p-3 ${
-                        mensaje.remitente === "yo"
-                          ? "bg-gym-blue text-white rounded-br-none"
-                          : "bg-muted rounded-bl-none"
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        mensaje.remitente === 'yo'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-900'
                       }`}
                     >
                       <p className="text-sm">{mensaje.texto}</p>
-                      <div
-                        className={`text-xs mt-1 flex justify-end ${
-                          mensaje.remitente === "yo" ? "text-white/70" : "text-muted-foreground"
-                        }`}
-                      >
-                        {mensaje.fecha}
+                      <div className="flex items-center justify-end mt-1 space-x-1">
+                        <span className="text-xs opacity-70">{mensaje.fecha}</span>
+                        {mensaje.remitente === 'yo' && (
+                          mensaje.leido ? (
+                            <CheckCheck className="w-3 h-3" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )
+                        )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-              
-              <Tabs defaultValue="mensaje" className="border-t">
-                <div className="flex items-center px-4 pt-2">
-                  <TabsList>
-                    <TabsTrigger value="mensaje" className="gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      <span className="hidden sm:inline">Mensaje</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="ejercicios" className="gap-2">
-                      <Dumbbell className="h-4 w-4" />
-                      <span className="hidden sm:inline">Ejercicios</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="chatbot" className="gap-2">
-                      <Bot className="h-4 w-4" />
-                      <span className="hidden sm:inline">ChatBot</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="mensaje" className="p-4 pt-2">
-                  <div className="flex gap-2">
-                    <div className="flex gap-2 items-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <PaperclipIcon className="h-5 w-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>
-                            <Image className="mr-2 h-4 w-4" />
-                            <span>Imagen</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="mr-2 h-4 w-4" />
-                            <span>Documento</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <Button variant="ghost" size="icon">
-                        <Smile className="h-5 w-5" />
-                      </Button>
-                    </div>
+
+              {/* Message Input */}
+              <div className="p-4 border-t border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <Button variant="ghost" size="sm">
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
+                  <div className="flex-1 relative">
                     <Input
                       placeholder="Escribe un mensaje..."
                       value={nuevoMensaje}
                       onChange={(e) => setNuevoMensaje(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
                           enviarMensaje();
+                          // Simular respuesta del bot si está activo
+                          if (botConfig.activo && conversacionActiva) {
+                            simularRespuestaBot(nuevoMensaje, conversacionActiva);
+                          }
                         }
                       }}
+                      className="pr-10"
                     />
-                    <Button onClick={enviarMensaje}>
-                      <Send className="h-5 w-5" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2"
+                    >
+                      <Smile className="w-4 h-4" />
                     </Button>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="ejercicios" className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {ejerciciosParaEnviar.map((ejercicio) => (
-                      <Card key={ejercicio.id} className="cursor-pointer hover:bg-muted/50">
-                        <CardHeader className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="rounded-full bg-muted p-1">
-                              <Dumbbell className="h-4 w-4 text-gym-blue" />
-                            </div>
-                            <CardTitle className="text-sm">{ejercicio.nombre}</CardTitle>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0">
-                          <div className="aspect-video overflow-hidden rounded-md bg-muted">
-                            <img
-                              src={ejercicio.thumbnail}
-                              alt={ejercicio.nombre}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          <Button className="w-full mt-2 text-xs">Enviar Ejercicio</Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="chatbot" className="p-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Utilizar ChatBot</CardTitle>
-                      <CardDescription>
-                        Envía mensajes automáticos utilizando el ChatBot
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          Bienvenida a nuevos clientes
-                        </Button>
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          Recordatorio de clases
-                        </Button>
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          Renovación de suscripción
-                        </Button>
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          Promociones especiales
-                        </Button>
-                        <div className="pt-2">
-                          <Button className="w-full">Configurar Respuestas</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                  <Button 
+                    onClick={() => {
+                      enviarMensaje();
+                      // Simular respuesta del bot si está activo
+                      if (botConfig.activo && conversacionActiva) {
+                        simularRespuestaBot(nuevoMensaje, conversacionActiva);
+                      }
+                    }}
+                    disabled={!nuevoMensaje.trim()}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full">
-              <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="font-medium text-lg">Gestor de WhatsApp</h3>
-              <p className="text-muted-foreground">
-                Selecciona una conversación para comenzar
-              </p>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Selecciona una conversación
+                </h3>
+                <p className="text-gray-500">
+                  Elige una conversación del panel izquierdo para comenzar a chatear
+                </p>
+              </div>
             </div>
           )}
         </div>

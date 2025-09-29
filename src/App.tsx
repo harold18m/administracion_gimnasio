@@ -11,6 +11,9 @@ import WhatsApp from "./pages/WhatsApp";
 import ChatBot from "./pages/ChatBot";
 import Clientes from "./pages/Clientes";
 import Asistencia from "./pages/Asistencia";
+import Calendario from "./pages/Calendario";
+import Configuracion from "./pages/Configuracion";
+import Membresias from "./pages/Membresias";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
 import NotFound from "./pages/NotFound";
@@ -48,7 +51,7 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    localStorage.getItem("fitgym-auth") === "true"
+    true // Cambiado a true para desarrollo - permite acceso directo a la configuración
   );
 
   const login = () => {
@@ -86,11 +89,14 @@ const App = () => {
                 </ProtectedRoute>
               }>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/asistencia" element={<Asistencia />} />
+                <Route path="/clientes" element={<Clientes />} />
+                <Route path="/membresias" element={<Membresias />} />
                 <Route path="/ejercicios" element={<Ejercicios />} />
                 <Route path="/whatsapp" element={<WhatsApp />} />
+                <Route path="/calendario" element={<Calendario />} />
                 <Route path="/chatbot" element={<ChatBot />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/asistencia" element={<Asistencia />} />
+                <Route path="/configuracion" element={<Configuracion />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />

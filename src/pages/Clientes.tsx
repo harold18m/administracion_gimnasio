@@ -17,6 +17,7 @@ export default function Clientes() {
     handleDelete,
     onSubmit,
     handleAddNew,
+    membresiasDisponibles,
   } = useClientes();
 
   return (
@@ -42,6 +43,7 @@ export default function Clientes() {
         onOpenChange={setIsDialogOpen}
         onSubmit={onSubmit}
         clienteActual={clienteActual}
+        membresiasDisponibles={membresiasDisponibles}
       />
     </div>
   );

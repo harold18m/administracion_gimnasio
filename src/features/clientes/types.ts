@@ -6,6 +6,8 @@ export interface Cliente {
   email: string;
   telefono: string;
   membresia: "activa" | "vencida" | "pendiente";
+  tipoMembresia?: string; // ID de la membresía asignada
+  nombreMembresia?: string; // Nombre de la membresía para mostrar
   fechaInicio: string;
   fechaFin: string;
   asistencias: number;
