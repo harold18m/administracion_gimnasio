@@ -123,6 +123,82 @@ INSERT INTO public.membresias (nombre, descripcion, tipo, modalidad, precio, dur
 ALTER TABLE public.membresias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 
+-- Tabla de Eventos del Calendario
+CREATE TABLE IF NOT EXISTS public.eventos (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    titulo VARCHAR(255) NOT NULL,
+    descripcion TEXT,
+    fecha DATE NOT NULL,
+    hora TIME NOT NULL,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('entrenamiento', 'evento', 'clase')),
+    cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
+    cliente_nombre VARCHAR(255), -- Para casos donde no hay cliente registrado
+    entrenador VARCHAR(255),
+    duracion INTEGER NOT NULL DEFAULT 60, -- en minutos
+    estado VARCHAR(20) DEFAULT 'programado' CHECK (estado IN ('programado', 'completado', 'cancelado')),
+    max_participantes INTEGER DEFAULT 1, -- Para clases grupales
+    participantes_actuales INTEGER DEFAULT 0,
+    precio DECIMAL(10,2), -- Para eventos pagos
+    notas TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Tabla de Asistencias
+CREATE TABLE IF NOT EXISTS public.asistencias (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    evento_id UUID REFERENCES public.eventos(id) ON DELETE CASCADE,
+    cliente_id UUID REFERENCES public.clientes(id) ON DELETE CASCADE,
+    fecha_asistencia TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    estado VARCHAR(20) DEFAULT 'presente' CHECK (estado IN ('presente', 'ausente', 'tardanza')),
+    notas TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(evento_id, cliente_id) -- Un cliente no puede tener múltiples registros para el mismo evento
+);
+
+-- Triggers para eventos
+CREATE TRIGGER update_eventos_updated_at 
+    BEFORE UPDATE ON public.eventos 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Función para actualizar contador de participantes
+CREATE OR REPLACE FUNCTION update_participantes_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE public.eventos 
+        SET participantes_actuales = participantes_actuales + 1 
+        WHERE id = NEW.evento_id;
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE public.eventos 
+        SET participantes_actuales = participantes_actuales - 1 
+        WHERE id = OLD.evento_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ language 'plpgsql';
+
+-- Trigger para actualizar contador de participantes
+CREATE TRIGGER update_eventos_participantes 
+    AFTER INSERT OR DELETE ON public.asistencias 
+    FOR EACH ROW EXECUTE FUNCTION update_participantes_count();
+
+-- Insertar eventos de ejemplo
+INSERT INTO public.eventos (titulo, descripcion, fecha, hora, tipo, cliente_nombre, entrenador, duracion, estado) VALUES
+('Entrenamiento Personal - Juan Pérez', 'Rutina de fuerza y cardio', CURRENT_DATE, '09:00', 'entrenamiento', 'Juan Pérez', 'Carlos Martínez', 60, 'programado'),
+('Clase de Yoga', 'Clase grupal de yoga para principiantes', CURRENT_DATE + INTERVAL '1 day', '18:00', 'clase', NULL, 'Ana García', 90, 'programado'),
+('Mantenimiento de Equipos', 'Revisión mensual de máquinas', CURRENT_DATE + INTERVAL '2 days', '08:00', 'evento', NULL, NULL, 120, 'programado'),
+('Clase de Spinning', 'Clase de spinning de alta intensidad', CURRENT_DATE + INTERVAL '3 days', '19:00', 'clase', NULL, 'Pedro López', 45, 'programado'),
+('Entrenamiento Funcional', 'Sesión de entrenamiento funcional grupal', CURRENT_DATE + INTERVAL '4 days', '17:00', 'clase', NULL, 'María Rodríguez', 60, 'programado');
+
+-- Habilitar Row Level Security para nuevas tablas
+ALTER TABLE public.eventos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.asistencias ENABLE ROW LEVEL SECURITY;
+
 -- Políticas básicas (permitir todo por ahora, se pueden refinar después)
 CREATE POLICY "Permitir todo en membresias" ON public.membresias FOR ALL USING (true);
 CREATE POLICY "Permitir todo en clientes" ON public.clientes FOR ALL USING (true);
+CREATE POLICY "Permitir todo en eventos" ON public.eventos FOR ALL USING (true);
+CREATE POLICY "Permitir todo en asistencias" ON public.asistencias FOR ALL USING (true);

@@ -11,127 +11,159 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarIcon, Plus, Clock, Users, Dumbbell, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, subDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface Evento {
   id: string;
-  titulo: string;
+  nombre: string;
   descripcion: string;
-  fecha: Date;
-  hora: string;
-  tipo: 'entrenamiento' | 'evento' | 'clase';
-  cliente?: string;
-  entrenador?: string;
-  duracion: number; // en minutos
-  estado: 'programado' | 'completado' | 'cancelado';
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo_evento: 'clase' | 'entrenamiento' | 'evento_especial' | 'mantenimiento';
+  estado: 'programado' | 'en_curso' | 'completado' | 'cancelado';
+  capacidad_maxima: number;
+  participantes_actuales: number;
+  precio: number;
+  instructor: string;
+  ubicacion: string;
 }
 
 const Calendario = () => {
   const [fechaActual, setFechaActual] = useState(new Date());
   const [vistaActual, setVistaActual] = useState<'mes' | 'semana' | 'dia'>('mes');
-  const [eventos, setEventos] = useState<Evento[]>([
-    {
-      id: '1',
-      titulo: 'Entrenamiento Personal - Juan Pérez',
-      descripcion: 'Rutina de fuerza y cardio',
-      fecha: new Date(),
-      hora: '09:00',
-      tipo: 'entrenamiento',
-      cliente: 'Juan Pérez',
-      entrenador: 'Carlos Martínez',
-      duracion: 60,
-      estado: 'programado'
-    },
-    {
-      id: '2',
-      titulo: 'Clase de Yoga',
-      descripcion: 'Clase grupal de yoga para principiantes',
-      fecha: new Date(Date.now() + 86400000), // mañana
-      hora: '18:00',
-      tipo: 'clase',
-      entrenador: 'Ana García',
-      duracion: 90,
-      estado: 'programado'
-    },
-    {
-      id: '3',
-      titulo: 'Mantenimiento de Equipos',
-      descripcion: 'Revisión mensual de máquinas',
-      fecha: new Date(Date.now() + 172800000), // pasado mañana
-      hora: '08:00',
-      tipo: 'evento',
-      duracion: 120,
-      estado: 'programado'
-    }
-  ]);
-
-  // Función para limpiar eventos antiguos (más de 1 mes)
-  const cleanOldEvents = () => {
-    const oneMonthAgo = subDays(new Date(), 30);
-    setEventos(prevEventos => 
-      prevEventos.filter(evento => new Date(evento.fecha) >= oneMonthAgo)
-    );
-  };
-
-  // Ejecutar limpieza al cargar el componente y cada día
-  useEffect(() => {
-    cleanOldEvents();
-    
-    // Configurar limpieza automática cada 24 horas
-    const interval = setInterval(cleanOldEvents, 24 * 60 * 60 * 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const [nuevoEvento, setNuevoEvento] = useState<Partial<Evento>>({
-    titulo: '',
+    nombre: '',
     descripcion: '',
-    fecha: new Date(),
-    hora: '',
-    tipo: 'entrenamiento',
-    cliente: '',
-    entrenador: '',
-    duracion: 60,
+    fecha_inicio: '',
+    fecha_fin: '',
+    tipo_evento: 'clase',
+    capacidad_maxima: 20,
+    precio: 0,
+    instructor: '',
+    ubicacion: '',
     estado: 'programado'
   });
 
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
+
+  // Cargar eventos desde Supabase
+  const cargarEventos = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('eventos')
+        .select('*')
+        .order('fecha_inicio', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar eventos:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los eventos",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setEventos(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Error de conexión",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarEventos();
+  }, []);
 
   const inicioMes = startOfMonth(fechaActual);
   const finMes = endOfMonth(fechaActual);
   const diasDelMes = eachDayOfInterval({ start: inicioMes, end: finMes });
 
   const obtenerEventosDelDia = (fecha: Date) => {
-    return eventos.filter(evento => isSameDay(evento.fecha, fecha));
+    return eventos.filter(evento => {
+      const fechaEvento = new Date(evento.fecha_inicio);
+      return isSameDay(fechaEvento, fecha);
+    });
   };
 
-  const agregarEvento = () => {
-    if (nuevoEvento.titulo && nuevoEvento.fecha && nuevoEvento.hora) {
-      const evento: Evento = {
-        id: Date.now().toString(),
-        titulo: nuevoEvento.titulo!,
-        descripcion: nuevoEvento.descripcion || '',
-        fecha: nuevoEvento.fecha!,
-        hora: nuevoEvento.hora!,
-        tipo: nuevoEvento.tipo || 'entrenamiento',
-        cliente: nuevoEvento.cliente,
-        entrenador: nuevoEvento.entrenador,
-        duracion: nuevoEvento.duracion || 60,
-        estado: 'programado'
-      };
+  const agregarEvento = async () => {
+    if (!nuevoEvento.nombre || !nuevoEvento.fecha_inicio || !nuevoEvento.fecha_fin) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos obligatorios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('eventos')
+        .insert([{
+          nombre: nuevoEvento.nombre,
+          descripcion: nuevoEvento.descripcion || '',
+          fecha_inicio: nuevoEvento.fecha_inicio,
+          fecha_fin: nuevoEvento.fecha_fin,
+          tipo_evento: nuevoEvento.tipo_evento || 'clase',
+          capacidad_maxima: nuevoEvento.capacidad_maxima || 20,
+          precio: nuevoEvento.precio || 0,
+          instructor: nuevoEvento.instructor || '',
+          ubicacion: nuevoEvento.ubicacion || '',
+          estado: 'programado'
+        }])
+        .select();
+
+      if (error) {
+        console.error('Error al crear evento:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo crear el evento",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Éxito",
+        description: "Evento creado correctamente",
+      });
+
+      // Recargar eventos
+      await cargarEventos();
       
-      setEventos([...eventos, evento]);
+      // Limpiar formulario
       setNuevoEvento({
-        titulo: '',
+        nombre: '',
         descripcion: '',
-        fecha: new Date(),
-        hora: '',
-        tipo: 'entrenamiento',
-        cliente: '',
-        entrenador: '',
-        duracion: 60,
+        fecha_inicio: '',
+        fecha_fin: '',
+        tipo_evento: 'clase',
+        capacidad_maxima: 20,
+        precio: 0,
+        instructor: '',
+        ubicacion: '',
         estado: 'programado'
       });
       setDialogoAbierto(false);
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Error de conexión",
+        variant: "destructive",
+      });
     }
   };
 
@@ -139,7 +171,8 @@ const Calendario = () => {
     switch (tipo) {
       case 'entrenamiento': return 'bg-blue-500';
       case 'clase': return 'bg-green-500';
-      case 'evento': return 'bg-purple-500';
+      case 'evento_especial': return 'bg-purple-500';
+      case 'mantenimiento': return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
   };
@@ -148,7 +181,8 @@ const Calendario = () => {
     switch (tipo) {
       case 'entrenamiento': return <Dumbbell className="h-3 w-3" />;
       case 'clase': return <Users className="h-3 w-3" />;
-      case 'evento': return <Star className="h-3 w-3" />;
+      case 'evento_especial': return <Star className="h-3 w-3" />;
+      case 'mantenimiento': return <Clock className="h-3 w-3" />;
       default: return <CalendarIcon className="h-3 w-3" />;
     }
   };
@@ -186,78 +220,90 @@ const Calendario = () => {
                 <Label htmlFor="titulo">Título</Label>
                 <Input
                   id="titulo"
-                  value={nuevoEvento.titulo}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, titulo: e.target.value})}
+                  value={nuevoEvento.nombre}
+                  onChange={(e) => setNuevoEvento({...nuevoEvento, nombre: e.target.value})}
                   placeholder="Ej: Entrenamiento Personal - Cliente"
                 />
               </div>
               
               <div>
                 <Label htmlFor="tipo">Tipo de Evento</Label>
-                <Select value={nuevoEvento.tipo} onValueChange={(value: 'entrenamiento' | 'evento' | 'clase') => setNuevoEvento({...nuevoEvento, tipo: value})}>
+                <Select value={nuevoEvento.tipo_evento} onValueChange={(value: 'clase' | 'entrenamiento' | 'evento_especial' | 'mantenimiento') => setNuevoEvento({...nuevoEvento, tipo_evento: value})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="entrenamiento">Entrenamiento Personal</SelectItem>
                     <SelectItem value="clase">Clase Grupal</SelectItem>
-                    <SelectItem value="evento">Evento/Mantenimiento</SelectItem>
+                    <SelectItem value="evento_especial">Evento Especial</SelectItem>
+                    <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="fecha">Fecha</Label>
+                  <Label htmlFor="fecha_inicio">Fecha de Inicio</Label>
                   <Input
-                    id="fecha"
-                    type="date"
-                    value={nuevoEvento.fecha ? format(nuevoEvento.fecha, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, fecha: new Date(e.target.value)})}
+                    id="fecha_inicio"
+                    type="datetime-local"
+                    value={nuevoEvento.fecha_inicio}
+                    onChange={(e) => setNuevoEvento({...nuevoEvento, fecha_inicio: e.target.value})}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="hora">Hora</Label>
+                  <Label htmlFor="fecha_fin">Fecha de Fin</Label>
                   <Input
-                    id="hora"
-                    type="time"
-                    value={nuevoEvento.hora}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, hora: e.target.value})}
+                    id="fecha_fin"
+                    type="datetime-local"
+                    value={nuevoEvento.fecha_fin}
+                    onChange={(e) => setNuevoEvento({...nuevoEvento, fecha_fin: e.target.value})}
                   />
                 </div>
               </div>
               
-              {nuevoEvento.tipo === 'entrenamiento' && (
-                <div>
-                  <Label htmlFor="cliente">Cliente</Label>
-                  <Input
-                    id="cliente"
-                    value={nuevoEvento.cliente}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, cliente: e.target.value})}
-                    placeholder="Nombre del cliente"
-                  />
-                </div>
-              )}
-              
               <div>
-                <Label htmlFor="entrenador">Entrenador/Instructor</Label>
+                <Label htmlFor="instructor">Instructor</Label>
                 <Input
-                  id="entrenador"
-                  value={nuevoEvento.entrenador}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, entrenador: e.target.value})}
-                  placeholder="Nombre del entrenador"
+                  id="instructor"
+                  value={nuevoEvento.instructor}
+                  onChange={(e) => setNuevoEvento({...nuevoEvento, instructor: e.target.value})}
+                  placeholder="Nombre del instructor"
                 />
               </div>
               
               <div>
-                <Label htmlFor="duracion">Duración (minutos)</Label>
+                <Label htmlFor="ubicacion">Ubicación</Label>
                 <Input
-                  id="duracion"
-                  type="number"
-                  value={nuevoEvento.duracion}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, duracion: parseInt(e.target.value)})}
-                  placeholder="60"
+                  id="ubicacion"
+                  value={nuevoEvento.ubicacion}
+                  onChange={(e) => setNuevoEvento({...nuevoEvento, ubicacion: e.target.value})}
+                  placeholder="Sala, área del gimnasio"
                 />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="capacidad">Capacidad Máxima</Label>
+                  <Input
+                    id="capacidad"
+                    type="number"
+                    value={nuevoEvento.capacidad_maxima}
+                    onChange={(e) => setNuevoEvento({...nuevoEvento, capacidad_maxima: parseInt(e.target.value) || 0})}
+                    placeholder="10"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="precio">Precio</Label>
+                  <Input
+                    id="precio"
+                    type="number"
+                    step="0.01"
+                    value={nuevoEvento.precio}
+                    onChange={(e) => setNuevoEvento({...nuevoEvento, precio: parseFloat(e.target.value) || 0})}
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
               
               <div>
@@ -346,13 +392,13 @@ const Calendario = () => {
                         {eventosDelDia.slice(0, 2).map(evento => (
                           <div
                             key={evento.id}
-                            className={`text-xs p-1 rounded text-white ${obtenerColorTipo(evento.tipo)}`}
+                            className={`text-xs p-1 rounded text-white ${obtenerColorTipo(evento.tipo_evento)}`}
                           >
                             <div className="flex items-center gap-1">
-                              {obtenerIconoTipo(evento.tipo)}
-                              <span className="truncate">{evento.hora}</span>
+                              {obtenerIconoTipo(evento.tipo_evento)}
+                              <span className="truncate">{format(new Date(evento.fecha_inicio), 'HH:mm')}</span>
                             </div>
-                            <div className="truncate font-medium">{evento.titulo}</div>
+                            <div className="truncate font-medium">{evento.nombre}</div>
                           </div>
                         ))}
                         {eventosDelDia.length > 2 && (
@@ -399,33 +445,34 @@ const Calendario = () => {
         <CardContent>
           <div className="space-y-3">
             {eventos
-              .filter(evento => evento.fecha >= new Date())
-              .sort((a, b) => a.fecha.getTime() - b.fecha.getTime())
+              .filter(evento => new Date(evento.fecha_inicio) >= new Date())
+              .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
               .slice(0, 5)
               .map(evento => (
                 <div key={evento.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full text-white ${obtenerColorTipo(evento.tipo)}`}>
-                      {obtenerIconoTipo(evento.tipo)}
+                    <div className={`p-2 rounded-full ${obtenerColorTipo(evento.tipo_evento)}`}>
+                      {obtenerIconoTipo(evento.tipo_evento)}
                     </div>
                     <div>
-                      <h4 className="font-medium">{evento.titulo}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {format(evento.fecha, 'dd/MM/yyyy', { locale: es })} a las {evento.hora}
-                      </p>
-                      {evento.cliente && (
-                        <p className="text-sm text-muted-foreground">Cliente: {evento.cliente}</p>
-                      )}
+                      <div className="font-medium">{evento.nombre}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(evento.fecha_inicio), 'dd/MM/yyyy HH:mm', { locale: es })} - {evento.instructor}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {evento.ubicacion} • {evento.participantes_actuales}/{evento.capacidad_maxima} participantes
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {evento.duracion}min
-                    </Badge>
+                  <div className="text-right">
                     <Badge variant={evento.estado === 'programado' ? 'default' : 'secondary'}>
                       {evento.estado}
                     </Badge>
+                    {evento.precio > 0 && (
+                      <div className="text-sm font-medium text-green-600">
+                        ${evento.precio}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
