@@ -18,8 +18,9 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Edit, Trash2 } from "lucide-react";
+import { Search, Edit, Trash2, Calendar, AlertTriangle } from "lucide-react";
 import { Cliente } from "./types";
+import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
 
 interface ClientesTableProps {
   clientes: Cliente[];
@@ -36,6 +37,8 @@ export function ClientesTable({
   onEdit,
   onDelete,
 }: ClientesTableProps) {
+  const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
+
   return (
     <Card>
       <CardHeader>
@@ -61,31 +64,34 @@ export function ClientesTable({
               <TableHead>Contacto</TableHead>
               <TableHead>Fecha Nacimiento</TableHead>
               <TableHead>Membresía</TableHead>
+              <TableHead>Estado</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {clientes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-4">
+                <TableCell colSpan={6} className="text-center py-4">
                   No se encontraron clientes
                 </TableCell>
               </TableRow>
             ) : (
-              clientes.map((cliente) => (
+              clientes.map((cliente) => {
+                const status = getMembershipStatus(cliente.fecha_fin);
+                return (
                 <TableRow key={cliente.id}>
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar>
                         <AvatarFallback>
-                          {cliente.nombre
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
+                          {cliente.nombre.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium">{cliente.nombre}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {cliente.dni || 'Sin DNI'}
+                        </p>
                       </div>
                     </div>
                   </TableCell>
@@ -109,6 +115,23 @@ export function ClientesTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <Badge 
+                        variant={status === 'active' ? 'default' : status === 'expiring' ? 'destructive' : 'secondary'}
+                        className={`${getStatusColor(status)} flex items-center space-x-1`}
+                      >
+                        {status === 'expiring' && <AlertTriangle className="h-3 w-3" />}
+                        {status === 'active' && <Calendar className="h-3 w-3" />}
+                        <span>{getStatusText(status)}</span>
+                      </Badge>
+                      {cliente.fecha_fin && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(cliente.fecha_fin).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex space-x-2">
                       <Button
                         variant="ghost"
@@ -127,7 +150,7 @@ export function ClientesTable({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+              )})
             )}
           </TableBody>
         </Table>

@@ -117,5 +117,34 @@ export interface Database {
         }
       }
     }
+    Functions: {
+      get_days_remaining: {
+        Args: {
+          client_id: string
+        }
+        Returns: number | null
+      }
+      get_expiring_memberships: {
+        Args: {
+          days_ahead?: number
+        }
+        Returns: {
+          id: string
+          nombre: string
+          email: string
+          telefono: string
+          fecha_fin: string
+          days_remaining: number
+          nombre_membresia: string
+        }[]
+      }
+      renew_membership: {
+        Args: {
+          client_id: string
+          new_membresia_id?: string
+        }
+        Returns: boolean
+      }
+    }
   }
 }

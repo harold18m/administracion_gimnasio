@@ -11,6 +11,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { RecentClients } from "@/components/dashboard/RecentClients";
 import { UpcomingClasses } from "@/components/dashboard/UpcomingClasses";
+import { ExpiringMemberships } from "@/components/dashboard/ExpiringMemberships";
 
 export default function Dashboard() {
   return (
@@ -55,11 +56,12 @@ export default function Dashboard() {
       
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
         <ActivityChart />
-        <RecentClients />
+        <ExpiringMemberships />
       </div>
       
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-6">
         <UpcomingClasses />
+        <RecentClients />
         <Card className="col-span-3 lg:col-span-3">
           <CardHeader>
             <CardTitle>Mensajes WhatsApp</CardTitle>

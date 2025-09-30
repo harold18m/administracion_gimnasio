@@ -93,6 +93,8 @@ export const useClientes = () => {
           telefono: values.telefono,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
+          fecha_inicio: values.fecha_inicio || null,
+          fecha_fin: values.fecha_fin || null,
         };
 
         const { data, error } = await supabase
@@ -120,6 +122,8 @@ export const useClientes = () => {
           telefono: values.telefono,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
+          fecha_inicio: values.fecha_inicio || null,
+          fecha_fin: values.fecha_fin || null,
           estado: 'activa',
           asistencias: 0,
         };

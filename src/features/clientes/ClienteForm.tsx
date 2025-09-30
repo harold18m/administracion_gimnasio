@@ -24,6 +24,8 @@ export const formSchema = z.object({
   telefono: z.string().min(9, { message: "El teléfono debe tener al menos 9 caracteres" }),
   fecha_nacimiento: z.string().min(1, { message: "La fecha de nacimiento es requerida" }),
   membresia_id: z.string().optional(),
+  fecha_inicio: z.string().optional(),
+  fecha_fin: z.string().optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -45,6 +47,8 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         telefono: "",
         fecha_nacimiento: "",
         membresia_id: "",
+        fecha_inicio: "",
+        fecha_fin: "",
       },
   });
 
@@ -56,6 +60,8 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         telefono: clienteActual.telefono,
         fecha_nacimiento: clienteActual.fecha_nacimiento || "",
         membresia_id: clienteActual.membresia_id || "",
+        fecha_inicio: clienteActual.fecha_inicio ? clienteActual.fecha_inicio.split('T')[0] : "",
+        fecha_fin: clienteActual.fecha_fin ? clienteActual.fecha_fin.split('T')[0] : "",
       });
     } else {
       form.reset({
@@ -64,6 +70,8 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         telefono: "",
         fecha_nacimiento: "",
         membresia_id: "",
+        fecha_inicio: "",
+        fecha_fin: "",
       });
     }
   }, [clienteActual, form]);
@@ -164,6 +172,32 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fecha de nacimiento</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fecha_inicio"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fecha de inicio de membresía</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fecha_fin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fecha de vencimiento de membresía</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
