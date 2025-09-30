@@ -15,6 +15,8 @@ export const useClientes = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [clienteActual, setClienteActual] = useState<Cliente | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [clienteToDelete, setClienteToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const { getMembresiasPorSeleccion } = useMembresias();
 
@@ -59,16 +61,23 @@ export const useClientes = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
+    setClienteToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!clienteToDelete) return;
+    
     try {
       const { error } = await supabase
         .from('clientes')
         .delete()
-        .eq('id', id);
+        .eq('id', clienteToDelete);
 
       if (error) throw error;
 
-      setClientes(clientes.filter((cliente) => cliente.id !== id));
+      setClientes(clientes.filter((cliente) => cliente.id !== clienteToDelete));
       toast({
         title: "Cliente eliminado",
         description: "El cliente ha sido eliminado correctamente",
@@ -80,6 +89,9 @@ export const useClientes = () => {
         description: "No se pudo eliminar el cliente",
         variant: "destructive",
       });
+    } finally {
+      setClienteToDelete(null);
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -171,6 +183,9 @@ export const useClientes = () => {
     loading,
     handleEdit,
     handleDelete,
+    confirmDelete,
+    isDeleteDialogOpen,
+    setIsDeleteDialogOpen,
     onSubmit,
     handleAddNew,
     membresiasDisponibles: getMembresiasPorSeleccion(),

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 import { ClientesTable } from "@/features/clientes/ClientesTable";
 import { ClienteForm } from "@/features/clientes/ClienteForm";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useClientes } from "@/features/clientes/useClientes";
 
 export default function Clientes() {
@@ -15,6 +16,9 @@ export default function Clientes() {
     clienteActual,
     handleEdit,
     handleDelete,
+    confirmDelete,
+    isDeleteDialogOpen,
+    setIsDeleteDialogOpen,
     onSubmit,
     handleAddNew,
     membresiasDisponibles,
@@ -44,6 +48,17 @@ export default function Clientes() {
         onSubmit={onSubmit}
         clienteActual={clienteActual}
         membresiasDisponibles={membresiasDisponibles}
+      />
+
+      <ConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        title="¿Eliminar cliente?"
+        description="Esta acción no se puede deshacer. El cliente será eliminado permanentemente del sistema."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="destructive"
       />
     </div>
   );

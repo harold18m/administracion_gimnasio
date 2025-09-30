@@ -17,6 +17,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Cliente } from "./types";
+import { useMembresias } from "@/hooks/useMembresias";
+import { format, addMonths } from "date-fns";
 
 export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
@@ -35,7 +37,7 @@ interface ClienteFormProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: FormValues) => void;
   clienteActual: Cliente | null;
-  membresiasDisponibles: { id: string; nombre: string; precio: number; tipo: string; modalidad: string }[];
+  membresiasDisponibles: { id: string; nombre: string; precio: number; tipo: string; modalidad: string; duracion?: number }[];
 }
 
 export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, membresiasDisponibles }: ClienteFormProps) {
@@ -47,10 +49,36 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         telefono: "",
         fecha_nacimiento: "",
         membresia_id: "",
-        fecha_inicio: "",
+        fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
         fecha_fin: "",
       },
   });
+
+  // Función para calcular fecha de vencimiento
+  const calcularFechaVencimiento = (membresiaId: string) => {
+    const membresiaSeleccionada = membresiasDisponibles.find(m => m.id === membresiaId);
+    if (membresiaSeleccionada && membresiaSeleccionada.duracion) {
+      const fechaInicio = new Date(form.getValues("fecha_inicio"));
+      const fechaVencimiento = addMonths(fechaInicio, membresiaSeleccionada.duracion);
+      return format(fechaVencimiento, "yyyy-MM-dd");
+    }
+    return "";
+  };
+
+  // Efecto para actualizar fecha de vencimiento cuando cambia la membresía o fecha de inicio
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "membresia_id" || name === "fecha_inicio") {
+        if (value.membresia_id && value.fecha_inicio) {
+          const fechaVencimiento = calcularFechaVencimiento(value.membresia_id);
+          if (fechaVencimiento) {
+            form.setValue("fecha_fin", fechaVencimiento);
+          }
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, membresiasDisponibles]);
 
   useEffect(() => {
     if (clienteActual) {
@@ -70,7 +98,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         telefono: "",
         fecha_nacimiento: "",
         membresia_id: "",
-        fecha_inicio: "",
+        fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
         fecha_fin: "",
       });
     }

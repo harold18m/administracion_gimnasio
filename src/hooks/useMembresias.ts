@@ -152,7 +152,8 @@ export const useMembresias = () => {
         nombre: m.nombre,
         precio: m.precio,
         tipo: m.tipo,
-        modalidad: m.modalidad
+        modalidad: m.modalidad,
+        duracion: m.duracion
       }));
   };
 
