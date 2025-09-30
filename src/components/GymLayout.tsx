@@ -1,6 +1,6 @@
 
 import { Outlet, useNavigate } from 'react-router-dom';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { GymSidebar } from '@/components/GymSidebar';
 import { Bell, User, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -107,23 +107,26 @@ export function GymLayout() {
       <div className="min-h-screen flex w-full">
         <GymSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b flex items-center px-6 gap-4 justify-between">
-            <h1 className="text-2xl font-bold">FitGym</h1>
-            <div className="flex items-center gap-4">
+          <header className="h-16 border-b flex items-center px-4 md:px-6 gap-4 justify-between">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="md:hidden" />
+              <h1 className="text-xl md:text-2xl font-bold">FitGym</h1>
+            </div>
+            <div className="flex items-center gap-2 md:gap-4">
               <DropdownMenu open={notificacionesAbiertas} onOpenChange={setNotificacionesAbiertas}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-4 w-4 md:h-5 md:w-5" />
                     {eventosProximos.length > 0 && (
                       <Badge 
-                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white"
+                        className="absolute -top-1 -right-1 h-4 w-4 md:h-5 md:w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white"
                       >
                         {eventosProximos.length}
                       </Badge>
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-80" align="end" forceMount>
+                <DropdownMenuContent className="w-72 md:w-80" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">Próximos Eventos</p>
@@ -139,7 +142,7 @@ export function GymLayout() {
                       No hay eventos próximos
                     </div>
                   ) : (
-                    <div className="max-h-80 overflow-y-auto">
+                    <div className="max-h-60 md:max-h-80 overflow-y-auto">
                       {eventosProximos.map((evento) => (
                         <DropdownMenuItem 
                           key={evento.id} 
@@ -186,7 +189,7 @@ export function GymLayout() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-9 w-9">
+                    <Avatar className="h-8 w-8 md:h-9 md:w-9">
                       <AvatarImage src="" alt="@admin" />
                       <AvatarFallback>AD</AvatarFallback>
                     </Avatar>
@@ -222,7 +225,7 @@ export function GymLayout() {
               </DropdownMenu>
             </div>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-4 md:p-6 overflow-auto">
             <Outlet />
           </main>
         </div>

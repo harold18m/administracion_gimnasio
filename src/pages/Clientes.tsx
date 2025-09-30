@@ -26,9 +26,9 @@ export default function Clientes() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold">Gestión de Clientes</h2>
-        <Button onClick={handleAddNew}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl sm:text-3xl font-bold">Gestión de Clientes</h2>
+        <Button onClick={handleAddNew} className="w-full sm:w-auto">
           <UserPlus className="mr-2 h-4 w-4" />
           Nuevo Cliente
         </Button>

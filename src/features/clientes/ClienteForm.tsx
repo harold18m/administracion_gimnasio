@@ -110,42 +110,42 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg md:text-xl">
             {clienteActual ? "Editar Cliente" : "Nuevo Cliente"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             {clienteActual
               ? "Modifica los datos del cliente"
               : "Completa los datos para registrar un nuevo cliente"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
             <FormField
               control={form.control}
               name="nombre"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre completo</FormLabel>
+                  <FormLabel className="text-sm">Nombre completo</FormLabel>
                   <FormControl>
-                    <Input placeholder="Juan Pérez" {...field} />
+                    <Input placeholder="Juan Pérez" className="text-sm" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-sm">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@ejemplo.com" {...field} />
+                      <Input placeholder="email@ejemplo.com" className="text-sm" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -156,9 +156,9 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                 name="telefono"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Teléfono</FormLabel>
+                    <FormLabel className="text-sm">Teléfono</FormLabel>
                     <FormControl>
-                      <Input placeholder="912345678" {...field} />
+                      <Input placeholder="912345678" className="text-sm" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -170,10 +170,10 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
               name="membresia_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Membresía</FormLabel>
+                  <FormLabel className="text-sm">Membresía</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="text-sm">
                         <SelectValue placeholder="Selecciona una membresía" />
                       </SelectTrigger>
                     </FormControl>
@@ -181,8 +181,8 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                       {membresiasDisponibles.map((membresia) => (
                         <SelectItem key={membresia.id} value={membresia.id}>
                           <div className="flex flex-col">
-                            <div className="font-medium">{membresia.nombre}</div>
-                            <div className="text-sm text-muted-foreground">
+                            <div className="font-medium text-sm">{membresia.nombre}</div>
+                            <div className="text-xs text-muted-foreground">
                               {membresia.tipo.charAt(0).toUpperCase() + membresia.tipo.slice(1)} • {membresia.modalidad.charAt(0).toUpperCase() + membresia.modalidad.slice(1)} • S/ {membresia.precio}
                             </div>
                           </div>
@@ -199,47 +199,49 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
               name="fecha_nacimiento"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fecha de nacimiento</FormLabel>
+                  <FormLabel className="text-sm">Fecha de nacimiento</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" className="text-sm" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="fecha_inicio"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fecha de inicio de membresía</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="fecha_fin"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fecha de vencimiento de membresía</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <FormField
+                control={form.control}
+                name="fecha_inicio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Fecha de inicio</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="text-sm" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fecha_fin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Fecha de vencimiento</FormLabel>
+                    <FormControl>
+                      <Input type="date" className="text-sm" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
               <DialogClose asChild>
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="w-full sm:w-auto text-sm">
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit">
+              <Button type="submit" className="w-full sm:w-auto text-sm">
                 {clienteActual ? "Actualizar" : "Guardar"}
               </Button>
             </DialogFooter>
