@@ -66,6 +66,7 @@ export interface Database {
           nombre: string
           email: string
           telefono: string
+          dni: string | null
           fecha_nacimiento: string
           fecha_registro: string
           membresia_id: string | null
@@ -84,6 +85,7 @@ export interface Database {
           nombre: string
           email: string
           telefono: string
+          dni?: string | null
           fecha_nacimiento: string
           fecha_registro?: string
           membresia_id?: string | null
@@ -102,6 +104,7 @@ export interface Database {
           nombre?: string
           email?: string
           telefono?: string
+          dni?: string | null
           fecha_nacimiento?: string
           fecha_registro?: string
           membresia_id?: string | null
@@ -114,6 +117,35 @@ export interface Database {
           avatar_url?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      , asistencias: {
+        Row: {
+          id: string
+          evento_id: string | null
+          cliente_id: string
+          fecha_asistencia: string
+          estado: 'presente' | 'ausente' | 'tardanza'
+          notas: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          evento_id?: string | null
+          cliente_id: string
+          fecha_asistencia?: string
+          estado?: 'presente' | 'ausente' | 'tardanza'
+          notas?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          evento_id?: string | null
+          cliente_id?: string
+          fecha_asistencia?: string
+          estado?: 'presente' | 'ausente' | 'tardanza'
+          notas?: string | null
+          created_at?: string
         }
       }
     }

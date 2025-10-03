@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,23 +29,9 @@ import {
   CheckCircle, 
   XCircle 
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase";
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  dni: string;
-  email: string;
-  membresia: "activa" | "vencida" | "pendiente";
-  avatarUrl?: string;
-}
-
-interface Asistencia {
-  id: string;
-  clienteId: string;
-  fecha: string;
-  hora: string;
-  tipo: "huella" | "dni";
-}
 
 const estadoStyle = {
   activa: "bg-green-500",
@@ -53,95 +39,120 @@ const estadoStyle = {
   pendiente: "bg-yellow-500",
 };
 
-const clientesDemo: Cliente[] = [
-  {
-    id: "1",
-    nombre: "Carlos Mendoza",
-    dni: "45678912",
-    email: "carlos@example.com",
-    membresia: "activa",
-  },
-  {
-    id: "2",
-    nombre: "María López",
-    dni: "87654321",
-    email: "maria@example.com",
-    membresia: "activa",
-  },
-  {
-    id: "3",
-    nombre: "Juan Pérez",
-    dni: "12345678",
-    email: "juan@example.com",
-    membresia: "pendiente",
-  },
-  {
-    id: "4",
-    nombre: "Ana García",
-    dni: "98765432",
-    email: "ana@example.com",
-    membresia: "vencida",
-  },
-  {
-    id: "5",
-    nombre: "Roberto Sánchez",
-    dni: "56789123",
-    email: "roberto@example.com",
-    membresia: "activa",
-  },
-];
 
-const asistenciasIniciales: Asistencia[] = [
-  {
-    id: "1",
-    clienteId: "1",
-    fecha: "2023-10-05",
-    hora: "08:30:15",
-    tipo: "huella",
-  },
-  {
-    id: "2",
-    clienteId: "2",
-    fecha: "2023-10-05",
-    hora: "09:15:42",
-    tipo: "dni",
-  },
-  {
-    id: "3",
-    clienteId: "3",
-    fecha: "2023-10-05",
-    hora: "10:05:33",
-    tipo: "huella",
-  },
-];
 
 export default function Asistencia() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dniInput, setDniInput] = useState("");
-  const [asistencias, setAsistencias] = useState<Asistencia[]>(asistenciasIniciales);
+  const [clientes, setClientes] = useState<Database["public"]["Tables"]["clientes"]["Row"][]>([]);
+  const [asistencias, setAsistencias] = useState<Database["public"]["Tables"]["asistencias"]["Row"][]>([]);
   const [modoAsistencia, setModoAsistencia] = useState<"huella" | "dni">("dni");
   const { toast } = useToast();
 
-  const registrarAsistencia = (cliente: Cliente, tipo: "huella" | "dni") => {
-    if (cliente.membresia === "vencida") {
+  useEffect(() => {
+    loadClientes();
+    loadAsistencias();
+  }, []);
+
+  const loadClientes = async () => {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("id, nombre, dni, estado, avatar_url, membresia_id, nombre_membresia, tipo_membresia, fecha_fin")
+      .order("created_at", { ascending: false });
+    if (error) {
       toast({
         variant: "destructive",
-        title: "Error de registro",
-        description: "La membresía de este cliente está vencida.",
+        title: "Error cargando clientes",
+        description: error.message,
       });
       return;
     }
-    
-    const now = new Date();
-    const fecha = now.toISOString().split("T")[0];
-    const hora = now.toTimeString().split(" ")[0];
-    
-    // Verificar si ya registró asistencia hoy
-    const yaRegistrado = asistencias.some(
-      (a) => a.clienteId === cliente.id && a.fecha === fecha
+
+    const clientesBase = data || [];
+
+    // Si no hay nombre_membresia/tipo_membresia, intentar enriquecer usando la relación membresia_id
+    const membresiaIds = Array.from(
+      new Set(
+        clientesBase
+          .map((c) => c.membresia_id)
+          .filter((id): id is string => Boolean(id))
+      )
     );
-    
-    if (yaRegistrado) {
+
+    if (membresiaIds.length > 0) {
+      const { data: membresiasData, error: membresiasError } = await supabase
+        .from("membresias")
+        .select("id, nombre, tipo")
+        .in("id", membresiaIds);
+
+      if (!membresiasError && membresiasData) {
+        const mapaMembresias = new Map(membresiasData.map((m) => [m.id, m]));
+        const enriquecidos = clientesBase.map((c) => {
+          const m = c.membresia_id ? mapaMembresias.get(c.membresia_id) : undefined;
+          return {
+            ...c,
+            nombre_membresia: c.nombre_membresia ?? (m ? m.nombre : null),
+            tipo_membresia: c.tipo_membresia ?? (m ? (m.tipo as Database["public"]["Tables"]["membresias"]["Row"]["tipo"]) : null),
+          };
+        });
+        setClientes(enriquecidos);
+        return;
+      }
+    }
+
+    setClientes(clientesBase);
+  };
+
+  const loadAsistencias = async () => {
+    const { data, error } = await supabase
+      .from("asistencias")
+      .select("id, cliente_id, fecha_asistencia, notas, created_at")
+      .order("fecha_asistencia", { ascending: false })
+      .limit(100);
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error cargando asistencias",
+        description: error.message,
+      });
+      return;
+    }
+    setAsistencias(data || []);
+  };
+
+  const registrarAsistencia = async (cliente: Database["public"]["Tables"]["clientes"]["Row"], tipo: "huella" | "dni") => {
+    if (cliente.estado === "vencida" || cliente.estado === "suspendida") {
+      toast({
+        variant: "destructive",
+        title: "Error de registro",
+        description: "La membresía de este cliente no está activa.",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const { data: yaHoy, error: errorCheck } = await supabase
+      .from("asistencias")
+      .select("id")
+      .eq("cliente_id", cliente.id)
+      .gte("fecha_asistencia", startOfDay.toISOString())
+      .lte("fecha_asistencia", endOfDay.toISOString());
+
+    if (errorCheck) {
+      toast({
+        variant: "destructive",
+        title: "Error de verificación",
+        description: errorCheck.message,
+      });
+      return;
+    }
+
+    if (yaHoy && yaHoy.length > 0) {
       toast({
         variant: "destructive",
         title: "Registro duplicado",
@@ -149,26 +160,40 @@ export default function Asistencia() {
       });
       return;
     }
-    
-    const nuevaAsistencia: Asistencia = {
-      id: Math.random().toString(36).substr(2, 9),
-      clienteId: cliente.id,
-      fecha,
-      hora,
-      tipo,
-    };
-    
-    setAsistencias([nuevaAsistencia, ...asistencias]);
-    
+
+    const { data: inserted, error: errorInsert } = await supabase
+      .from("asistencias")
+      .insert({
+        cliente_id: cliente.id,
+        estado: "presente",
+        notas: tipo,
+      })
+      .select("id, cliente_id, fecha_asistencia, notas, created_at")
+      .single();
+
+    if (errorInsert) {
+      toast({
+        variant: "destructive",
+        title: "Error registrando asistencia",
+        description: errorInsert.message,
+      });
+      return;
+    }
+
+    setAsistencias((prev) => (inserted ? [inserted, ...prev] : prev));
+
+    const hora = new Date(inserted?.fecha_asistencia || Date.now())
+      .toTimeString()
+      .split(" ")[0];
     toast({
       title: "Asistencia registrada",
       description: `${cliente.nombre} ha registrado su asistencia a las ${hora}.`,
     });
-    
+
     setDniInput("");
   };
 
-  const registrarPorDNI = () => {
+  const registrarPorDNI = async () => {
     if (!dniInput) {
       toast({
         variant: "destructive",
@@ -177,9 +202,22 @@ export default function Asistencia() {
       });
       return;
     }
-    
-    const cliente = clientesDemo.find((c) => c.dni === dniInput);
-    
+
+    const { data: cliente, error } = await supabase
+      .from("clientes")
+      .select("id, nombre, dni, estado, avatar_url")
+      .eq("dni", dniInput)
+      .maybeSingle();
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error buscando cliente",
+        description: error.message,
+      });
+      return;
+    }
+
     if (!cliente) {
       toast({
         variant: "destructive",
@@ -188,41 +226,60 @@ export default function Asistencia() {
       });
       return;
     }
-    
-    registrarAsistencia(cliente, "dni");
+
+    await registrarAsistencia(cliente, "dni");
   };
 
-  const simularHuella = () => {
-    // Simula la lectura de una huella digital aleatoria
-    const clienteAleatorio = clientesDemo[Math.floor(Math.random() * clientesDemo.length)];
-    
+  const simularHuella = async () => {
+    // Simula la lectura de una huella digital usando clientes reales
+    if (clientes.length === 0) {
+      await loadClientes();
+    }
+
+    const clienteAleatorio = clientes[Math.floor(Math.random() * clientes.length)];
+
+    if (!clienteAleatorio) {
+      toast({
+        variant: "destructive",
+        title: "No hay clientes",
+        description: "Agrega clientes para poder simular huella.",
+      });
+      return;
+    }
+
     toast({
       title: "Huella detectada",
       description: "Procesando identificación...",
     });
-    
-    // Simula un pequeño retraso en el procesamiento
+
     setTimeout(() => {
       registrarAsistencia(clienteAleatorio, "huella");
     }, 1500);
   };
 
-  // Obtener clientes de las asistencias
+  // Obtener clientes de las asistencias (unir asistencias con clientes)
   const clientesConAsistencia = asistencias
-    .filter((asistencia) =>
-      asistencia.fecha.includes(searchTerm) ||
-      clientesDemo
-        .find((c) => c.id === asistencia.clienteId)
-        ?.nombre.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      clientesDemo
-        .find((c) => c.id === asistencia.clienteId)
-        ?.dni.includes(searchTerm)
-    )
+    .filter((asistencia) => {
+      const cliente = clientes.find((c) => c.id === asistencia.cliente_id);
+      const nombreMatch = cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+      const dniMatch = (cliente?.dni || "").includes(searchTerm);
+      const fechaMatch = new Date(asistencia.fecha_asistencia)
+        .toLocaleDateString()
+        .includes(searchTerm);
+      return Boolean(nombreMatch || dniMatch || fechaMatch);
+    })
     .map((asistencia) => {
-      const cliente = clientesDemo.find((c) => c.id === asistencia.clienteId);
+      const cliente = clientes.find((c) => c.id === asistencia.cliente_id);
+      const fecha = new Date(asistencia.fecha_asistencia);
+      const hora = fecha.toTimeString().split(" ")[0];
+      const tipo = asistencia.notas === "huella" ? "huella" : "dni";
       return {
-        asistencia,
+        asistencia: {
+          id: asistencia.id,
+          fecha: asistencia.fecha_asistencia,
+          hora,
+          tipo,
+        },
         cliente,
       };
     });
@@ -304,7 +361,7 @@ export default function Asistencia() {
                 <Clock className="mr-1 h-3 w-3" />
                 <span>
                   {asistencias.filter(
-                    (a) => a.fecha === new Date().toISOString().split("T")[0]
+                    (a) => new Date(a.fecha_asistencia).toDateString() === new Date().toDateString()
                   ).length}{" "}
                   hoy
                 </span>
@@ -330,6 +387,8 @@ export default function Asistencia() {
                       <TableHead>Cliente</TableHead>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Hora</TableHead>
+                      <TableHead>Membresía</TableHead>
+                      <TableHead>Vence</TableHead>
                       <TableHead>Método</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -339,10 +398,10 @@ export default function Asistencia() {
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Avatar>
-                              <AvatarImage src={cliente?.avatarUrl} />
+                              <AvatarImage src={cliente?.avatar_url || undefined} />
                               <AvatarFallback>
                                 {cliente?.nombre
-                                  .split(" ")
+                                  ?.split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
@@ -359,6 +418,15 @@ export default function Asistencia() {
                           {new Date(asistencia.fecha).toLocaleDateString()}
                         </TableCell>
                         <TableCell>{asistencia.hora}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{cliente?.nombre_membresia ?? "Sin membresía"}</p>
+                            <p className="text-xs text-muted-foreground">{cliente?.tipo_membresia ?? ""}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {cliente?.fecha_fin ? new Date(cliente.fecha_fin).toLocaleDateString() : "—"}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"

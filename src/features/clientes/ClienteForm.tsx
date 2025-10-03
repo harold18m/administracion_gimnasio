@@ -24,6 +24,12 @@ export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
   email: z.string().email({ message: "Correo electrónico inválido" }),
   telefono: z.string().min(9, { message: "El teléfono debe tener al menos 9 caracteres" }),
+  dni: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d{7,20}$/.test(val), {
+      message: "El DNI debe contener entre 7 y 20 dígitos",
+    }),
   fecha_nacimiento: z.string().min(1, { message: "La fecha de nacimiento es requerida" }),
   membresia_id: z.string().optional(),
   fecha_inicio: z.string().optional(),
@@ -47,6 +53,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         nombre: "",
         email: "",
         telefono: "",
+        dni: "",
         fecha_nacimiento: "",
         membresia_id: "",
         fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
@@ -86,6 +93,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         nombre: clienteActual.nombre,
         email: clienteActual.email,
         telefono: clienteActual.telefono,
+        dni: clienteActual.dni || "",
         fecha_nacimiento: clienteActual.fecha_nacimiento || "",
         membresia_id: clienteActual.membresia_id || "",
         fecha_inicio: clienteActual.fecha_inicio ? clienteActual.fecha_inicio.split('T')[0] : "",
@@ -165,6 +173,19 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="dni"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">DNI (opcional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="12345678" className="text-sm" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="membresia_id"

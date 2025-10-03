@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.clientes (
     nombre VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     telefono VARCHAR(20) NOT NULL,
+    dni VARCHAR(20) UNIQUE,
     fecha_nacimiento DATE NOT NULL,
     fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     membresia_id UUID REFERENCES public.membresias(id) ON DELETE SET NULL,

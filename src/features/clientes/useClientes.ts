@@ -53,7 +53,8 @@ export const useClientes = () => {
     (cliente) =>
       cliente.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       cliente.email.toLowerCase().includes(busqueda.toLowerCase()) ||
-      cliente.telefono.includes(busqueda)
+      cliente.telefono.includes(busqueda) ||
+      (cliente.dni?.includes(busqueda) ?? false)
   );
 
   const handleEdit = (cliente: Cliente) => {
@@ -103,6 +104,7 @@ export const useClientes = () => {
           nombre: values.nombre,
           email: values.email,
           telefono: values.telefono,
+          dni: values.dni || null,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
           fecha_inicio: values.fecha_inicio || null,
@@ -132,6 +134,7 @@ export const useClientes = () => {
           nombre: values.nombre,
           email: values.email,
           telefono: values.telefono,
+          dni: values.dni || null,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
           fecha_inicio: values.fecha_inicio || null,
