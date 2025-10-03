@@ -18,6 +18,7 @@ import { useAuth } from '@/App';
 import { useState, useEffect } from 'react';
 import { format, isToday, isTomorrow, addHours } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { supabase } from "@/lib/supabase";
 
 export function GymLayout() {
   const navigate = useNavigate();
@@ -27,44 +28,51 @@ export function GymLayout() {
   const [eventosProximos, setEventosProximos] = useState<any[]>([]);
   const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
   
-  // Función para obtener eventos de las próximas 24 horas
-  const obtenerEventosProximos = () => {
-    // Simulamos eventos - en una app real, esto vendría de una API o contexto global
-    const eventos = [
-      {
-        id: "1",
-        titulo: "Entrenamiento Personal - Juan Pérez",
-        fecha: new Date(2024, 11, 15, 10, 0),
-        tipo: "entrenamiento",
-        cliente: "Juan Pérez",
-        entrenador: "Carlos Rodríguez",
-        duracion: 60
-      },
-      {
-        id: "2",
-        titulo: "Clase de Yoga",
-        fecha: new Date(2024, 11, 15, 18, 0),
-        tipo: "clase",
-        entrenador: "María González",
-        duracion: 90
-      },
-      {
-        id: "3",
-        titulo: "Mantenimiento Equipos",
-        fecha: addHours(new Date(), 2),
-        tipo: "evento",
-        duracion: 120
+  // Función para obtener eventos de las próximas 24 horas desde Supabase
+  const obtenerEventosProximos = async () => {
+    try {
+      const ahora = new Date();
+      const en24Horas = addHours(ahora, 24);
+      const desdeStr = format(ahora, 'yyyy-MM-dd');
+      const hastaStr = format(en24Horas, 'yyyy-MM-dd');
+
+      const { data, error } = await supabase
+        .from('eventos')
+        .select('id, titulo, fecha, hora, tipo, cliente_nombre, entrenador, duracion')
+        .gte('fecha', desdeStr)
+        .lte('fecha', hastaStr)
+        .order('fecha', { ascending: true })
+        .order('hora', { ascending: true });
+
+      if (error) {
+        console.error('Error cargando eventos próximos:', error);
+        setEventosProximos([]);
+        return;
       }
-    ];
-    
-    const ahora = new Date();
-    const en24Horas = addHours(ahora, 24);
-    
-    const eventosFiltrados = eventos.filter(evento => 
-      evento.fecha >= ahora && evento.fecha <= en24Horas
-    );
-    
-    setEventosProximos(eventosFiltrados);
+
+      const mapped = (data || []).map((e: any) => {
+        const [h, m] = (e.hora || '00:00').split(':').map(Number);
+        const parts = (e.fecha || '').split('-').map(Number);
+        // fecha en formato yyyy-MM-dd
+        const fechaDate = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, h || 0, m || 0);
+        return {
+          id: e.id,
+          titulo: e.titulo,
+          fecha: fechaDate,
+          tipo: e.tipo,
+          cliente: e.cliente_nombre || undefined,
+          entrenador: e.entrenador || undefined,
+          duracion: e.duracion || undefined,
+        };
+      });
+
+      // Filtramos para que queden solo los próximos 24h exactos por si hay eventos fuera del rango horario del mismo día
+      const eventosFiltrados = mapped.filter(ev => ev.fecha >= ahora && ev.fecha <= en24Horas);
+      setEventosProximos(eventosFiltrados);
+    } catch (err) {
+      console.error('Error conectando con Supabase:', err);
+      setEventosProximos([]);
+    }
   };
   
   useEffect(() => {

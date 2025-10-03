@@ -62,7 +62,38 @@ const statusStyles = {
   pendiente: "bg-yellow-500",
 };
 
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
 export function RecentClients() {
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecent = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("clientes")
+          .select("id, nombre, email, estado, updated_at, avatar_url")
+          .order("updated_at", { ascending: false })
+          .limit(5);
+        if (error) {
+          console.error("Error cargando clientes recientes:", error);
+          setClients([]);
+        } else {
+          setClients(data || []);
+        }
+      } catch (err) {
+        console.error("Error conectando con Supabase:", err);
+        setClients([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecent();
+  }, []);
+
   return (
     <Card className="col-span-3">
       <CardHeader>
@@ -73,43 +104,49 @@ export function RecentClients() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentClients.map((client) => (
-            <div
-              key={client.id}
-              className="flex items-center justify-between space-x-4"
-            >
-              <div className="flex items-center space-x-4">
-                <Avatar>
-                  <AvatarImage src={client.avatarUrl} />
-                  <AvatarFallback>
-                    {client.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-medium leading-none">
-                    {client.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {client.email}
-                  </p>
+          {loading ? (
+            <div className="text-sm text-muted-foreground">Cargando...</div>
+          ) : clients.length === 0 ? (
+            <div className="text-sm text-muted-foreground">Sin actividad reciente</div>
+          ) : (
+            clients.map((client) => (
+              <div
+                key={client.id}
+                className="flex items-center justify-between space-x-4"
+              >
+                <div className="flex items-center space-x-4">
+                  <Avatar>
+                    <AvatarImage src={client.avatar_url || undefined} />
+                    <AvatarFallback>
+                      {String(client.nombre || "?")
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium leading-none">
+                      {client.nombre}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {client.email || ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge
+                    variant="secondary"
+                    className={statusStyles[(client.estado as keyof typeof statusStyles) || "pendiente"]}
+                  >
+                    {client.estado}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(client.updated_at).toLocaleString()}
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Badge
-                  variant="secondary"
-                  className={statusStyles[client.status]}
-                >
-                  {client.status}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {client.lastActivity}
-                </span>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>
