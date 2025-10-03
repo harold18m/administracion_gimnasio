@@ -16,17 +16,20 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Evento {
   id: string;
-  nombre: string;
-  descripcion: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  tipo_evento: 'clase' | 'entrenamiento' | 'evento_especial' | 'mantenimiento';
-  estado: 'programado' | 'en_curso' | 'completado' | 'cancelado';
-  capacidad_maxima: number;
+  titulo: string;
+  descripcion: string | null;
+  fecha: string; // YYYY-MM-DD
+  hora: string; // HH:mm:ss or HH:mm
+  tipo: 'entrenamiento' | 'evento' | 'clase';
+  estado: 'programado' | 'completado' | 'cancelado';
+  cliente_id?: string | null;
+  cliente_nombre?: string | null;
+  entrenador?: string | null;
+  duracion: number;
+  max_participantes: number;
   participantes_actuales: number;
-  precio: number;
-  instructor: string;
-  ubicacion: string;
+  precio: number | null;
+  notas?: string | null;
 }
 
 const Calendario = () => {
@@ -37,15 +40,16 @@ const Calendario = () => {
   const { toast } = useToast();
 
   const [nuevoEvento, setNuevoEvento] = useState<Partial<Evento>>({
-    nombre: '',
+    titulo: '',
     descripcion: '',
-    fecha_inicio: '',
-    fecha_fin: '',
-    tipo_evento: 'clase',
-    capacidad_maxima: 20,
+    fecha: '',
+    hora: '',
+    tipo: 'entrenamiento',
+    max_participantes: 20,
     precio: 0,
-    instructor: '',
-    ubicacion: '',
+    entrenador: '',
+    cliente_nombre: '',
+    notas: '',
     estado: 'programado'
   });
 
@@ -58,7 +62,8 @@ const Calendario = () => {
       const { data, error } = await supabase
         .from('eventos')
         .select('*')
-        .order('fecha_inicio', { ascending: true });
+        .order('fecha', { ascending: true })
+        .order('hora', { ascending: true });
 
       if (error) {
         console.error('Error al cargar eventos:', error);
@@ -93,16 +98,16 @@ const Calendario = () => {
 
   const obtenerEventosDelDia = (fecha: Date) => {
     return eventos.filter(evento => {
-      const fechaEvento = new Date(evento.fecha_inicio);
+      const fechaEvento = new Date(`${evento.fecha}T${evento.hora}`);
       return isSameDay(fechaEvento, fecha);
     });
   };
 
   const agregarEvento = async () => {
-    if (!nuevoEvento.nombre || !nuevoEvento.fecha_inicio || !nuevoEvento.fecha_fin) {
+    if (!nuevoEvento.titulo || !nuevoEvento.fecha || !nuevoEvento.hora) {
       toast({
         title: "Error",
-        description: "Por favor completa todos los campos obligatorios",
+        description: "Por favor completa el título, fecha y hora",
         variant: "destructive",
       });
       return;
@@ -111,17 +116,18 @@ const Calendario = () => {
     try {
       const { data, error } = await supabase
         .from('eventos')
-        .insert([{
-          nombre: nuevoEvento.nombre,
+        .insert([{ 
+          titulo: nuevoEvento.titulo!,
           descripcion: nuevoEvento.descripcion || '',
-          fecha_inicio: nuevoEvento.fecha_inicio,
-          fecha_fin: nuevoEvento.fecha_fin,
-          tipo_evento: nuevoEvento.tipo_evento || 'clase',
-          capacidad_maxima: nuevoEvento.capacidad_maxima || 20,
-          precio: nuevoEvento.precio || 0,
-          instructor: nuevoEvento.instructor || '',
-          ubicacion: nuevoEvento.ubicacion || '',
-          estado: 'programado'
+          fecha: nuevoEvento.fecha!,
+          hora: nuevoEvento.hora!,
+          tipo: nuevoEvento.tipo || 'entrenamiento',
+          max_participantes: nuevoEvento.max_participantes || 1,
+          precio: nuevoEvento.precio ?? 0,
+          entrenador: nuevoEvento.entrenador || null,
+          cliente_nombre: nuevoEvento.cliente_nombre || null,
+          notas: nuevoEvento.notas || '',
+          estado: 'programado',
         }])
         .select();
 
@@ -140,20 +146,19 @@ const Calendario = () => {
         description: "Evento creado correctamente",
       });
 
-      // Recargar eventos
       await cargarEventos();
-      
-      // Limpiar formulario
+
       setNuevoEvento({
-        nombre: '',
+        titulo: '',
         descripcion: '',
-        fecha_inicio: '',
-        fecha_fin: '',
-        tipo_evento: 'clase',
-        capacidad_maxima: 20,
+        fecha: '',
+        hora: '',
+        tipo: 'entrenamiento',
+        max_participantes: 20,
         precio: 0,
-        instructor: '',
-        ubicacion: '',
+        entrenador: '',
+        cliente_nombre: '',
+        notas: '',
         estado: 'programado'
       });
       setDialogoAbierto(false);
@@ -171,8 +176,7 @@ const Calendario = () => {
     switch (tipo) {
       case 'entrenamiento': return 'bg-blue-500';
       case 'clase': return 'bg-green-500';
-      case 'evento_especial': return 'bg-purple-500';
-      case 'mantenimiento': return 'bg-orange-500';
+      case 'evento': return 'bg-purple-500';
       default: return 'bg-gray-500';
     }
   };
@@ -181,8 +185,7 @@ const Calendario = () => {
     switch (tipo) {
       case 'entrenamiento': return <Dumbbell className="h-3 w-3" />;
       case 'clase': return <Users className="h-3 w-3" />;
-      case 'evento_especial': return <Star className="h-3 w-3" />;
-      case 'mantenimiento': return <Clock className="h-3 w-3" />;
+      case 'evento': return <Star className="h-3 w-3" />;
       default: return <CalendarIcon className="h-3 w-3" />;
     }
   };
@@ -220,99 +223,98 @@ const Calendario = () => {
                 <Label htmlFor="titulo">Título</Label>
                 <Input
                   id="titulo"
-                  value={nuevoEvento.nombre}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, nombre: e.target.value})}
+                  value={nuevoEvento.titulo || ''}
+                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, titulo: e.target.value })}
                   placeholder="Ej: Entrenamiento Personal - Cliente"
                 />
               </div>
               
               <div>
                 <Label htmlFor="tipo">Tipo de Evento</Label>
-                <Select value={nuevoEvento.tipo_evento} onValueChange={(value: 'clase' | 'entrenamiento' | 'evento_especial' | 'mantenimiento') => setNuevoEvento({...nuevoEvento, tipo_evento: value})}>
+                <Select value={nuevoEvento.tipo} onValueChange={(value: 'clase' | 'entrenamiento' | 'evento') => setNuevoEvento({ ...nuevoEvento, tipo: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="entrenamiento">Entrenamiento Personal</SelectItem>
                     <SelectItem value="clase">Clase Grupal</SelectItem>
-                    <SelectItem value="evento_especial">Evento Especial</SelectItem>
-                    <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+                    <SelectItem value="evento">Evento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="fecha_inicio">Fecha de Inicio</Label>
+                  <Label htmlFor="fecha">Fecha</Label>
                   <Input
-                    id="fecha_inicio"
-                    type="datetime-local"
-                    value={nuevoEvento.fecha_inicio}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, fecha_inicio: e.target.value})}
+                    id="fecha"
+                    type="date"
+                    value={nuevoEvento.fecha || ''}
+                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, fecha: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="fecha_fin">Fecha de Fin</Label>
+                  <Label htmlFor="hora">Hora</Label>
                   <Input
-                    id="fecha_fin"
-                    type="datetime-local"
-                    value={nuevoEvento.fecha_fin}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, fecha_fin: e.target.value})}
+                    id="hora"
+                    type="time"
+                    value={nuevoEvento.hora || ''}
+                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, hora: e.target.value })}
                   />
                 </div>
               </div>
               
               <div>
-                <Label htmlFor="instructor">Instructor</Label>
+                <Label htmlFor="entrenador">Entrenador</Label>
                 <Input
-                  id="instructor"
-                  value={nuevoEvento.instructor}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, instructor: e.target.value})}
-                  placeholder="Nombre del instructor"
+                  id="entrenador"
+                  value={nuevoEvento.entrenador || ''}
+                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, entrenador: e.target.value })}
+                  placeholder="Nombre del entrenador"
                 />
               </div>
               
               <div>
-                <Label htmlFor="ubicacion">Ubicación</Label>
+                <Label htmlFor="capacidad">Capacidad Máxima</Label>
                 <Input
-                  id="ubicacion"
-                  value={nuevoEvento.ubicacion}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, ubicacion: e.target.value})}
-                  placeholder="Sala, área del gimnasio"
+                  id="capacidad"
+                  type="number"
+                  value={nuevoEvento.max_participantes ?? 0}
+                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, max_participantes: parseInt(e.target.value) || 0 })}
+                  placeholder="10"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="capacidad">Capacidad Máxima</Label>
-                  <Input
-                    id="capacidad"
-                    type="number"
-                    value={nuevoEvento.capacidad_maxima}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, capacidad_maxima: parseInt(e.target.value) || 0})}
-                    placeholder="10"
-                  />
-                </div>
                 <div>
                   <Label htmlFor="precio">Precio</Label>
                   <Input
                     id="precio"
                     type="number"
                     step="0.01"
-                    value={nuevoEvento.precio}
-                    onChange={(e) => setNuevoEvento({...nuevoEvento, precio: parseFloat(e.target.value) || 0})}
+                    value={Number(nuevoEvento.precio ?? 0)}
+                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, precio: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="descripcion">Descripción</Label>
+                  <Textarea
+                    id="descripcion"
+                    value={nuevoEvento.descripcion || ''}
+                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, descripcion: e.target.value })}
+                    placeholder="Detalles adicionales..."
                   />
                 </div>
               </div>
               
               <div>
-                <Label htmlFor="descripcion">Descripción</Label>
+                <Label htmlFor="notas">Notas</Label>
                 <Textarea
-                  id="descripcion"
-                  value={nuevoEvento.descripcion}
-                  onChange={(e) => setNuevoEvento({...nuevoEvento, descripcion: e.target.value})}
-                  placeholder="Detalles adicionales..."
+                  id="notas"
+                  value={nuevoEvento.notas || ''}
+                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, notas: e.target.value })}
+                  placeholder="Información adicional (ubicación, recordatorios, etc.)"
                 />
               </div>
               
@@ -376,7 +378,6 @@ const Calendario = () => {
                 {diasDelMes.map(dia => {
                   const eventosDelDia = obtenerEventosDelDia(dia);
                   const esHoy = isSameDay(dia, new Date());
-                  
                   return (
                     <div
                       key={dia.toISOString()}
@@ -392,13 +393,13 @@ const Calendario = () => {
                         {eventosDelDia.slice(0, 2).map(evento => (
                           <div
                             key={evento.id}
-                            className={`text-xs p-1 rounded text-white ${obtenerColorTipo(evento.tipo_evento)}`}
+                            className={`text-xs p-1 rounded text-white ${obtenerColorTipo(evento.tipo)}`}
                           >
                             <div className="flex items-center gap-1">
-                              {obtenerIconoTipo(evento.tipo_evento)}
-                              <span className="truncate">{format(new Date(evento.fecha_inicio), 'HH:mm')}</span>
+                              {obtenerIconoTipo(evento.tipo)}
+                              <span className="truncate">{format(new Date(`${evento.fecha}T${evento.hora}`), 'HH:mm')}</span>
                             </div>
-                            <div className="truncate font-medium">{evento.nombre}</div>
+                            <div className="truncate font-medium">{evento.titulo}</div>
                           </div>
                         ))}
                         {eventosDelDia.length > 2 && (
@@ -445,22 +446,20 @@ const Calendario = () => {
         <CardContent>
           <div className="space-y-3">
             {eventos
-              .filter(evento => new Date(evento.fecha_inicio) >= new Date())
-              .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
+              .filter(evento => new Date(`${evento.fecha}T${evento.hora}`) >= new Date())
+              .sort((a, b) => new Date(`${a.fecha}T${a.hora}`).getTime() - new Date(`${b.fecha}T${b.hora}`).getTime())
               .slice(0, 5)
               .map(evento => (
                 <div key={evento.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${obtenerColorTipo(evento.tipo_evento)}`}>
-                      {obtenerIconoTipo(evento.tipo_evento)}
-                    </div>
+                    <div className={`p-2 rounded-full ${obtenerColorTipo(evento.tipo)}`}>{obtenerIconoTipo(evento.tipo)}</div>
                     <div>
-                      <div className="font-medium">{evento.nombre}</div>
+                      <div className="font-medium">{evento.titulo}</div>
                       <div className="text-sm text-muted-foreground">
-                        {format(new Date(evento.fecha_inicio), 'dd/MM/yyyy HH:mm', { locale: es })} - {evento.instructor}
+                        {format(new Date(`${evento.fecha}T${evento.hora}`), 'dd/MM/yyyy HH:mm', { locale: es })} - {evento.entrenador || 'Sin entrenador'}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {evento.ubicacion} • {evento.participantes_actuales}/{evento.capacidad_maxima} participantes
+                        {evento.participantes_actuales}/{evento.max_participantes} participantes
                       </div>
                     </div>
                   </div>
@@ -468,7 +467,7 @@ const Calendario = () => {
                     <Badge variant={evento.estado === 'programado' ? 'default' : 'secondary'}>
                       {evento.estado}
                     </Badge>
-                    {evento.precio > 0 && (
+                    {(evento.precio ?? 0) > 0 && (
                       <div className="text-sm font-medium text-green-600">
                         ${evento.precio}
                       </div>
