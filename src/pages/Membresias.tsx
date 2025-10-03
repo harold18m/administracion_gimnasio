@@ -488,7 +488,7 @@ const Membresias = () => {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />
-                            {membresia.clientesActivos} activos
+                            {membresia.clientes_activos} activos
                           </div>
                           <Badge variant={membresia.activa ? "default" : "secondary"}>
                             {membresia.activa ? "Activa" : "Inactiva"}
