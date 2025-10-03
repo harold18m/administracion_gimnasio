@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Plus, Edit, Trash2, Users, Calendar, DollarSign, Clock, Star } from "lucide-react";
 import { useMembresias } from "@/hooks/useMembresias";
 import type { Database } from "@/lib/supabase";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 type Membresia = Database['public']['Tables']['membresias']['Row'];
 type MembresiaInsert = Database['public']['Tables']['membresias']['Insert'];
@@ -38,6 +39,9 @@ const Membresias = () => {
     activa: true
   });
 
+  // Estado para confirmación de eliminación
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [membresiaAEliminar, setMembresiaAEliminar] = useState<Membresia | null>(null);
   const [nuevaCaracteristica, setNuevaCaracteristica] = useState('');
 
   const tiposMembresia = [
@@ -123,6 +127,13 @@ const Membresias = () => {
 
   const eliminarMembresiaHandler = async (id: string) => {
     await eliminarMembresia(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (membresiaAEliminar) {
+      await eliminarMembresiaHandler(membresiaAEliminar.id);
+      setMembresiaAEliminar(null);
+    }
   };
 
   const toggleEstadoMembresia = async (id: string) => {
@@ -307,6 +318,17 @@ const Membresias = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        <ConfirmationDialog
+          isOpen={confirmDeleteOpen}
+          onOpenChange={setConfirmDeleteOpen}
+          onConfirm={handleConfirmDelete}
+          title="Confirmar eliminación"
+          description={`¿Estás seguro de eliminar la membresía "${membresiaAEliminar?.nombre || ''}"? Esta acción no se puede deshacer.`}
+          confirmText="Eliminar"
+          cancelText="Cancelar"
+          variant="destructive"
+        />
       </div>
 
       <Tabs defaultValue="todas" className="space-y-4">
@@ -353,7 +375,7 @@ const Membresias = () => {
                           variant="ghost" 
                           size="sm" 
                           className="text-red-500"
-                          onClick={() => eliminarMembresiaHandler(membresia.id)}
+                          onClick={() => { setMembresiaAEliminar(membresia); setConfirmDeleteOpen(true); }}
                         >
                           <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
@@ -441,7 +463,7 @@ const Membresias = () => {
                               variant="ghost" 
                               size="icon" 
                               className="text-red-500"
-                              onClick={() => eliminarMembresiaHandler(membresia.id)}
+                              onClick={() => { setMembresiaAEliminar(membresia); setConfirmDeleteOpen(true); }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
