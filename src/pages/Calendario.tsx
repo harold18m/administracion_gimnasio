@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarIcon, Plus, Clock, Users, Dumbbell, Star, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, subDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, subDays, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -94,7 +94,10 @@ const Calendario = () => {
 
   const inicioMes = startOfMonth(fechaActual);
   const finMes = endOfMonth(fechaActual);
-  const diasDelMes = eachDayOfInterval({ start: inicioMes, end: finMes });
+  // Extiende al rango semanal completo (domingo a sábado) para que la cuadrícula mensual siempre muestre semanas completas
+  const inicioCuadricula = startOfWeek(inicioMes, { weekStartsOn: 0 });
+  const finCuadricula = endOfWeek(finMes, { weekStartsOn: 0 });
+  const diasDelMes = eachDayOfInterval({ start: inicioCuadricula, end: finCuadricula });
 
   const obtenerEventosDelDia = (fecha: Date) => {
     return eventos.filter(evento => {
