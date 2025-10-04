@@ -14,14 +14,25 @@ import { useClientes } from "@/features/clientes/useClientes";
 
 export function ExpiringMemberships() {
   const { clientes } = useClientes();
-  const { getMembershipStatus, getStatusColor, getStatusText, getDaysRemaining } = useMembershipExpiration();
+  const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
 
-  // Filtrar clientes con membresías próximas a vencer (menos de 7 días)
+  // Calcular días restantes localmente (sin RPC)
+  const calcDaysRemaining = (fechaFin: string | null): number | null => {
+    if (!fechaFin) return null;
+    const today = new Date();
+    const endDate = new Date(fechaFin);
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    const diffTime = startOfEnd.getTime() - startOfToday.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Mostrar solo clientes con membresías por vencer (<= 7 días)
   const expiringClients = clientes.filter(cliente => {
     if (!cliente.fecha_fin) return false;
     const status = getMembershipStatus(cliente.fecha_fin);
-    const daysRemaining = getDaysRemaining(cliente.fecha_fin);
-    return status === 'expiring' || (status === 'active' && daysRemaining !== null && daysRemaining <= 7);
+    return status === 'por_vencer';
   }).slice(0, 5); // Mostrar solo los primeros 5
 
   return (
@@ -47,7 +58,7 @@ export function ExpiringMemberships() {
           <div className="space-y-4">
             {expiringClients.map((cliente) => {
               const status = getMembershipStatus(cliente.fecha_fin);
-              const daysRemaining = getDaysRemaining(cliente.fecha_fin);
+              const daysRemaining = calcDaysRemaining(cliente.fecha_fin);
               
               return (
                 <div
@@ -71,12 +82,12 @@ export function ExpiringMemberships() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge
-                      variant={status === 'expiring' ? 'destructive' : 'secondary'}
+                      variant={status === 'por_vencer' ? 'destructive' : 'secondary'}
                       className={`${getStatusColor(status)} text-xs`}
                     >
                       {daysRemaining !== null && daysRemaining >= 0 
                         ? `${daysRemaining} días`
-                        : 'Vencida'
+                        : getStatusText(status)
                       }
                     </Badge>
                     <Button
