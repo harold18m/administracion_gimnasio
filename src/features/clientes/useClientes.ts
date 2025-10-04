@@ -96,7 +96,7 @@ export const useClientes = () => {
     }
   };
 
-  const onSubmit = async (values: any) => {
+  const saveCliente = async (values: any, options: { closeDialog?: boolean } = { closeDialog: true }) => {
     try {
       if (clienteActual) {
         // Editar cliente existente
@@ -128,6 +128,13 @@ export const useClientes = () => {
           title: "Cliente actualizado",
           description: "Los datos del cliente han sido actualizados correctamente",
         });
+
+        if (options.closeDialog) {
+          setIsDialogOpen(false);
+          setClienteActual(null);
+        }
+
+        return data;
       } else {
         // Agregar nuevo cliente
         const insertData: ClienteInsert = {
@@ -156,10 +163,14 @@ export const useClientes = () => {
           title: "Cliente agregado",
           description: "El nuevo cliente ha sido agregado correctamente",
         });
-      }
 
-      setIsDialogOpen(false);
-      setClienteActual(null);
+        if (options.closeDialog) {
+          setIsDialogOpen(false);
+          setClienteActual(null);
+        }
+
+        return data;
+      }
     } catch (err) {
       console.error('Error al guardar cliente:', err);
       toast({
@@ -167,7 +178,12 @@ export const useClientes = () => {
         description: "No se pudo guardar el cliente",
         variant: "destructive",
       });
+      throw err;
     }
+  };
+
+  const onSubmit = async (values: any) => {
+    await saveCliente(values, { closeDialog: true });
   };
 
   const handleAddNew = () => {
@@ -193,5 +209,6 @@ export const useClientes = () => {
     handleAddNew,
     membresiasDisponibles: getMembresiasPorSeleccion(),
     fetchClientes,
+    saveCliente,
   };
 };
