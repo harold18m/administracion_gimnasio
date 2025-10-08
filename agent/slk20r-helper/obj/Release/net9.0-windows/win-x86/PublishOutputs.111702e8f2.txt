@@ -1,0 +1,4 @@
+C:\Users\adria\Desktop\proyecto\fitgym\SISTEMA 2.0\fitgym\agent\slk20r-helper\bin\Release\net9.0-windows\win-x86\publish\lib\zkfinger10-32.dll
+C:\Users\adria\Desktop\proyecto\fitgym\SISTEMA 2.0\fitgym\agent\slk20r-helper\bin\Release\net9.0-windows\win-x86\publish\lib\zkfinger10.dll
+C:\Users\adria\Desktop\proyecto\fitgym\SISTEMA 2.0\fitgym\agent\slk20r-helper\bin\Release\net9.0-windows\win-x86\publish\lib\libzkfp.dll
+C:\Users\adria\Desktop\proyecto\fitgym\SISTEMA 2.0\fitgym\agent\slk20r-helper\bin\Release\net9.0-windows\win-x86\publish\slk20r-helper.exe

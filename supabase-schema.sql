@@ -318,3 +318,31 @@ CREATE POLICY "Permitir todo en membresias" ON public.membresias FOR ALL USING (
 CREATE POLICY "Permitir todo en clientes" ON public.clientes FOR ALL USING (true);
 CREATE POLICY "Permitir todo en eventos" ON public.eventos FOR ALL USING (true);
 CREATE POLICY "Permitir todo en asistencias" ON public.asistencias FOR ALL USING (true);
+
+-- Tabla de plantillas de huella
+CREATE TABLE IF NOT EXISTS public.fingerprint_templates (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
+    finger_label VARCHAR(50),
+    format VARCHAR(50) NOT NULL,
+    template_len INTEGER NOT NULL,
+    image_width INTEGER NOT NULL,
+    image_height INTEGER NOT NULL,
+    dpi INTEGER NOT NULL,
+    enc_nonce_b64 TEXT NOT NULL,
+    enc_tag_b64 TEXT NOT NULL,
+    enc_ciphertext_b64 TEXT NOT NULL,
+    source_device TEXT,
+    json_raw JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Índices
+CREATE INDEX IF NOT EXISTS fingerprint_templates_cliente_id_idx ON public.fingerprint_templates(cliente_id);
+CREATE UNIQUE INDEX IF NOT EXISTS fingerprint_templates_unique_per_finger ON public.fingerprint_templates(cliente_id, finger_label) WHERE finger_label IS NOT NULL;
+
+-- Habilitar RLS
+ALTER TABLE public.fingerprint_templates ENABLE ROW LEVEL SECURITY;
+
+-- Políticas cerradas: no se definen políticas de acceso para anon/authenticated.
+-- Inserciones/lecturas se harán desde backend con service role que ignora RLS.

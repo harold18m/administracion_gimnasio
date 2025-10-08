@@ -17,11 +17,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Cliente } from "./types";
-import { useMembresias } from "@/hooks/useMembresias";
 import { format, addMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 
 export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
@@ -123,6 +122,13 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
   const [enrollDate, setEnrollDate] = useState<string | null>(null);
   const [isEnrolling, setIsEnrolling] = useState<boolean>(false);
   const AGENT_URL = (import.meta as any).env?.VITE_AGENT_URL || "http://localhost:5599";
+  const VERCEL_API_BASE = (import.meta as any).env?.VITE_VERCEL_API_BASE || "";
+
+  useEffect(() => {
+    if (isOpen) {
+      checkAgentHealth();
+    }
+  }, [isOpen]);
 
   const handleSubmit = form.handleSubmit((values) => {
     onSubmit(values);
@@ -131,12 +137,16 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
   const checkAgentHealth = async () => {
     try {
       setAgentStatus("checking");
-      const res = await fetch(`${AGENT_URL}/health`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 7000);
+      const res = await fetch(`${AGENT_URL}/health`, { signal: controller.signal });
+      clearTimeout(timeout);
       if (!res.ok) throw new Error("Agente no disponible");
       setAgentStatus("online");
       return true;
     } catch (e) {
       setAgentStatus("offline");
+      toast({ title: "Agente offline", description: "No se pudo conectar con el agente local. Asegúrate de que esté ejecutándose.", variant: "destructive" });
       return false;
     }
   };
@@ -157,21 +167,62 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
 
       setEnrollState("enrolling");
       setEnrollMessage("Capturando y subiendo la huella...");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 190000);
       const res = await fetch(`${AGENT_URL}/enroll`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId })
+        body: JSON.stringify({ client_id: clientId, finger_label: "right_index" }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || "Error al enrolar huella");
       }
 
+      // Parsear resultado del helper
+      const agentPayload = await res.json();
+      const helperJson = agentPayload?.json;
+      if (!helperJson) {
+        throw new Error("No se recibió JSON del helper.");
+      }
+      if (helperJson.ok === false) {
+        throw new Error(helperJson.error || "La captura de la huella falló.");
+      }
+
+      // Si el agente ya guardó en Supabase, evitar inserción duplicada desde el backend
+      if (agentPayload?.supabase_id) {
+        setEnrollState("success");
+        const now = new Date();
+        setEnrollDate(format(now, "yyyy-MM-dd HH:mm"));
+        setEnrollMessage("Huella enrolada y guardada correctamente (guardada por el agente).");
+        toast({ title: "Huella enrolada", description: "La huella ha sido enrolada exitosamente." });
+        return;
+      }
+
+      // Enviar al backend de Vercel para guardar en Supabase
+      setEnrollMessage("Subiendo plantilla al backend...");
+      const base = VERCEL_API_BASE || window.location.origin;
+      const saveRes = await fetch(`${base}/api/fingerprint/enroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cliente_id: clientId, finger_label: helperJson?.finger_label || "right_index", json: helperJson }),
+      });
+      if (!saveRes.ok) {
+        const errText = await saveRes.text();
+        throw new Error(errText || "No se pudo guardar la huella en el backend.");
+      }
+      const saveJson = await saveRes.json();
+      if (!saveJson?.ok) {
+        throw new Error(saveJson?.error || "No se pudo guardar la huella.");
+      }
+
       setEnrollState("success");
       const now = new Date();
       setEnrollDate(format(now, "yyyy-MM-dd HH:mm"));
-      setEnrollMessage("Huella enrolada correctamente.");
+      setEnrollMessage("Huella enrolada y guardada correctamente.");
       toast({ title: "Huella enrolada", description: "La huella ha sido enrolada exitosamente." });
     } catch (err: any) {
       console.error(err);
@@ -357,6 +408,10 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                 <Badge variant={agentStatus === 'online' ? 'default' : agentStatus === 'offline' ? 'destructive' : 'secondary'}>
                   {agentStatus === 'online' ? 'Agente conectado' : agentStatus === 'offline' ? 'Agente desconectado' : agentStatus === 'checking' ? 'Verificando agente...' : 'Agente'}
                 </Badge>
+                <Button type="button" variant="ghost" className="h-9 w-9 p-0" onClick={checkAgentHealth} disabled={agentStatus === 'checking'}>
+                  {agentStatus === 'checking' ? (<Loader2 className="h-4 w-4 animate-spin" />) : (<RefreshCw className="h-4 w-4" />)}
+                  <span className="sr-only">Verificar agente</span>
+                </Button>
                 {enrollDate && (
                   <Badge variant="outline">Huella enrolada: {enrollDate}</Badge>
                 )}
@@ -370,10 +425,10 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                 <Button type="submit" className="w-full sm:w-auto text-sm" disabled={form.formState.isSubmitting}>
                   {clienteActual ? "Actualizar" : "Guardar"}
                 </Button>
-                <Button type="button" className="w-full sm:w-auto text-sm" onClick={handleGuardarYEnrolar} disabled={isEnrolling || form.formState.isSubmitting}>
+                <Button type="button" className="w-full sm:w-auto text-sm" onClick={handleGuardarYEnrolar} disabled={isEnrolling || form.formState.isSubmitting || agentStatus !== 'online'}>
                   {isEnrolling ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enrolando...</>) : 'Guardar y Enrolar'}
                 </Button>
-                <Button type="button" variant="secondary" className="w-full sm:w-auto text-sm" onClick={handleActualizarHuella} disabled={!clienteActual?.id || isEnrolling}>
+                <Button type="button" variant="secondary" className="w-full sm:w-auto text-sm" onClick={handleActualizarHuella} disabled={!clienteActual?.id || isEnrolling || agentStatus !== 'online'}>
                   {isEnrolling ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enrolando...</>) : 'Actualizar huella'}
                 </Button>
               </div>
