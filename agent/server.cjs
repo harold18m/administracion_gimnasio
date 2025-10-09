@@ -191,20 +191,20 @@ app.post('/enroll', async (req, res) => {
       }
 
       try {
-        const { data: inserted, error } = await supabase
+        const { data: upserted, error } = await supabase
           .from('fingerprint_templates')
-          .insert(row)
+          .upsert(row, { onConflict: 'cliente_id,finger_label' })
           .select('id')
           .single();
 
         if (error) {
-          console.error('[agent] supabase insert failed:', error.message);
+          console.error('[agent] supabase upsert failed:', error.message);
           return res.status(500).json({ error: 'supabase_insert_failed', detail: error.message });
         }
 
-        return res.json({ status: 'success', client_id, supabase_id: inserted.id, json: helperResult });
+        return res.json({ status: 'success', client_id, supabase_id: upserted.id, json: helperResult });
       } catch (e) {
-        console.error('[agent] supabase insert exception:', e.message);
+        console.error('[agent] supabase upsert exception:', e.message);
         return res.status(500).json({ error: 'supabase_insert_exception', detail: e.message });
       }
     }

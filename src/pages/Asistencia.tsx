@@ -48,6 +48,7 @@ export default function Asistencia() {
   const [asistencias, setAsistencias] = useState<Database["public"]["Tables"]["asistencias"]["Row"][]>([]);
   const [modoAsistencia, setModoAsistencia] = useState<"huella" | "dni">("dni");
   const { toast } = useToast();
+  const AGENT_URL = (import.meta as any).env?.VITE_AGENT_URL || "http://localhost:5599";
 
   useEffect(() => {
     loadClientes();
@@ -230,6 +231,32 @@ export default function Asistencia() {
     await registrarAsistencia(cliente, "dni");
   };
 
+  // Sustituye la simulación de huella por una verificación segura que no registra usuarios al azar
+  const verificarHuella = async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 7000);
+      const res = await fetch(`${AGENT_URL}/health`, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error("Agente no disponible");
+
+      toast({
+        variant: "destructive",
+        title: "Verificación por huella no disponible",
+        description:
+          "El agente aún no implementa identificación de huella para asistencia. Evita usar este método por ahora.",
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Agente offline",
+        description:
+          "No se pudo conectar con el agente local. Asegúrate de que esté ejecutándose.",
+      });
+    }
+  };
+
   const simularHuella = async () => {
     // Simula la lectura de una huella digital usando clientes reales
     if (clientes.length === 0) {
@@ -339,7 +366,7 @@ export default function Asistencia() {
               <div className="space-y-4">
                 <Button
                   className="w-full h-20 text-lg"
-                  onClick={simularHuella}
+                  onClick={verificarHuella}
                 >
                   <Fingerprint className="mr-2 h-6 w-6" />
                   Colocar dedo en el lector
@@ -457,3 +484,6 @@ export default function Asistencia() {
     </div>
   );
 }
+
+// verificarHuella se define dentro del componente Asistencia para acceder a toast y AGENT_URL.
+// (Se eliminó la definición externa para evitar errores de referencia)
