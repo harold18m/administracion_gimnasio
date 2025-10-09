@@ -57,6 +57,22 @@ class Program
     [DllImport("libzkfp.dll", CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
     private static extern int ZKFPM_ExtractFromImage(IntPtr hDBCache, string lpFilePathName, uint DPI, byte[] fpTemplate, ref uint cbTemplate);
 
+    // Add DB operations for identification
+    [DllImport("libzkfp.dll", CallingConvention = CallingConvention.StdCall)]
+    private static extern int ZKFPM_DBAdd(IntPtr hDBCache, int fid, byte[] fpTemplate, int cbTemplate);
+
+    [DllImport("libzkfp.dll", CallingConvention = CallingConvention.StdCall)]
+    private static extern int ZKFPM_DBClear(IntPtr hDBCache);
+
+    [DllImport("libzkfp.dll", CallingConvention = CallingConvention.StdCall)]
+    private static extern int ZKFPM_DBCount(IntPtr hDBCache);
+
+    [DllImport("libzkfp.dll", CallingConvention = CallingConvention.StdCall)]
+    private static extern int ZKFPM_DBIdentify(IntPtr hDBCache, byte[] fpTemplate, ref int fid, ref int score);
+
+    [DllImport("libzkfp.dll", CallingConvention = CallingConvention.StdCall)]
+    private static extern int ZKFPM_DBMatch(IntPtr hDBCache, byte[] temp1, byte[] temp2);
+
     static int Main(string[] args)
     {
       try
@@ -74,6 +90,8 @@ class Program
             return RunCheck();
           case "--enroll":
             return RunEnroll();
+          case "--identify":
+            return RunIdentify();
           default:
             Console.WriteLine(JsonSerializer.Serialize(new { error = "unknown_cmd" }));
             return 1;

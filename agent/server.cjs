@@ -56,7 +56,7 @@ function resolveHelperPath() {
   return { mode: 'none', path: '' };
 }
 
-function runHelper(args = [], timeoutMs = 20000) {
+function runHelper(args = [], timeoutMs = 20000, stdinPayload = null) {
   return new Promise((resolve, reject) => {
     const helper = resolveHelperPath();
     console.log(`[agent] runHelper mode=${helper.mode} path=${helper.path} args=${args.join(' ')}`);
@@ -64,9 +64,9 @@ function runHelper(args = [], timeoutMs = 20000) {
 
     try {
       if (helper.mode === 'exe') {
-        child = spawn(helper.path, args, { stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+        child = spawn(helper.path, args, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
       } else if (helper.mode === 'dotnet') {
-        child = spawn('dotnet', ['run', '--project', helper.path, '--', ...args], { stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+        child = spawn('dotnet', ['run', '--project', helper.path, '--', ...args], { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
       } else {
         return reject(new Error('Helper not found'));
       }
@@ -82,6 +82,11 @@ function runHelper(args = [], timeoutMs = 20000) {
       console.warn('[agent] helper timeout reached');
       return resolve({ ok: false, error: 'helper_timeout' });
     }, timeoutMs);
+
+    if (stdinPayload && child.stdin) {
+      try { child.stdin.write(typeof stdinPayload === 'string' ? stdinPayload : JSON.stringify(stdinPayload)); } catch {}
+      try { child.stdin.end(); } catch {}
+    }
 
     child.stdout.on('data', (d) => { stdout += d.toString(); });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -214,6 +219,67 @@ app.post('/enroll', async (req, res) => {
   } catch (err) {
     console.error('[agent] enroll error:', err);
     return res.status(500).json({ error: 'Error durante el enrolamiento' });
+  }
+});
+
+// Identify endpoint
+app.post('/identify', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ error: 'supabase_not_configured' });
+    }
+
+    // Recuperar plantillas cifradas desde Supabase
+    let templates = [];
+    try {
+      const { data, error } = await supabase
+        .from('fingerprint_templates')
+        .select('cliente_id,finger_label,enc_nonce_b64,enc_tag_b64,enc_ciphertext_b64')
+        .limit(10000);
+      if (error) {
+        console.error('[agent] supabase fetch templates failed:', error.message);
+        return res.status(500).json({ error: 'supabase_fetch_failed', detail: error.message });
+      }
+      templates = data || [];
+    } catch (e) {
+      console.error('[agent] supabase fetch exception:', e.message);
+      return res.status(500).json({ error: 'supabase_fetch_exception', detail: e.message });
+    }
+
+    if (!templates || templates.length === 0) {
+      return res.status(404).json({ error: 'no_templates' });
+    }
+
+    // Ejecutar helper con stdin
+    let helperResult;
+    try {
+      helperResult = await runHelper(['--identify'], 180000, JSON.stringify({ templates }));
+    } catch (err) {
+      console.error('[agent] helper identify error:', err.message);
+      return res.status(503).json({ error: 'helper_unavailable', detail: err.message });
+    }
+
+    if (!helperResult) {
+      return res.status(422).json({ error: 'identify_failed' });
+    }
+
+    if (helperResult.ok === false) {
+      const err = helperResult.error || 'identify_failed';
+      if (err === 'no_match') {
+        return res.status(404).json({ error: 'no_match', loaded: helperResult.loaded });
+      }
+      return res.status(422).json({ error: err, detail: helperResult });
+    }
+
+    const match = helperResult.match;
+    if (!match || !match.cliente_id) {
+      return res.status(404).json({ error: 'no_match', loaded: helperResult.loaded });
+    }
+
+    return res.json({ status: 'success', match, loaded: helperResult.loaded });
+  } catch (err) {
+    console.error('[agent] identify error:', err);
+    return res.status(500).json({ error: 'Error durante la identificación' });
   }
 });
 

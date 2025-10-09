@@ -231,28 +231,87 @@ export default function Asistencia() {
     await registrarAsistencia(cliente, "dni");
   };
 
-  // Sustituye la simulación de huella por una verificación segura que no registra usuarios al azar
+  // Sustituye la simulación de huella por identificación real via agente
   const verificarHuella = async () => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 7000);
-      const res = await fetch(`${AGENT_URL}/health`, { signal: controller.signal });
-      clearTimeout(timeout);
+      // 1) Verificar salud del agente
+      {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(`${AGENT_URL}/health`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error("Agente no disponible");
+        const payload = await res.json();
+        if (payload?.helper !== "ok" || !payload?.device_connected) {
+          toast({
+            variant: "destructive",
+            title: "Lector no disponible",
+            description: "El agente o el lector no están listos. Verifica la conexión.",
+          });
+          return;
+        }
+      }
 
-      if (!res.ok) throw new Error("Agente no disponible");
+      toast({ title: "Huella detectada", description: "Intentando identificar..." });
 
-      toast({
-        variant: "destructive",
-        title: "Verificación por huella no disponible",
-        description:
-          "El agente aún no implementa identificación de huella para asistencia. Evita usar este método por ahora.",
+      // 2) Enviar solicitud de identificación
+      const controller2 = new AbortController();
+      const timeout2 = setTimeout(() => controller2.abort(), 190000);
+      const resId = await fetch(`${AGENT_URL}/identify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        signal: controller2.signal,
       });
-    } catch (e) {
+      clearTimeout(timeout2);
+
+      if (!resId.ok) {
+        const text = await resId.text();
+        if (resId.status === 404) {
+          toast({
+            variant: "destructive",
+            title: "Sin coincidencia",
+            description: "No se encontró ninguna coincidencia con las plantillas registradas.",
+          });
+          return;
+        }
+        throw new Error(text || "Error en identificación");
+      }
+
+      const agentPayload = await resId.json();
+      const match = agentPayload?.match;
+      if (!match?.cliente_id) {
+        toast({
+          variant: "destructive",
+          title: "Sin coincidencia",
+          description: "No se encontró ninguna coincidencia con las plantillas registradas.",
+        });
+        return;
+      }
+
+      // 3) Cargar cliente por cliente_id
+      const { data: cliente, error } = await supabase
+        .from("clientes")
+        .select("id, nombre, dni, estado, avatar_url")
+        .eq("id", match.cliente_id)
+        .maybeSingle();
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error buscando cliente", description: error.message });
+        return;
+      }
+      if (!cliente) {
+        toast({ variant: "destructive", title: "Cliente no encontrado", description: "La coincidencia no corresponde a un cliente registrado." });
+        return;
+      }
+
+      // 4) Registrar asistencia por huella
+      await registrarAsistencia(cliente, "huella");
+    } catch (e: any) {
       toast({
         variant: "destructive",
         title: "Agente offline",
-        description:
-          "No se pudo conectar con el agente local. Asegúrate de que esté ejecutándose.",
+        description: e?.message || "No se pudo conectar con el agente local.",
       });
     }
   };
@@ -484,6 +543,3 @@ export default function Asistencia() {
     </div>
   );
 }
-
-// verificarHuella se define dentro del componente Asistencia para acceder a toast y AGENT_URL.
-// (Se eliminó la definición externa para evitar errores de referencia)
