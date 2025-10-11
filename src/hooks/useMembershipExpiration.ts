@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { diffDaysFromTodayLocal } from '@/lib/utils';
 
 interface ExpiringMembership {
   id: string;
@@ -87,15 +88,11 @@ export const useMembershipExpiration = () => {
     }
   };
 
-  // Calcular estado de membresía basado en fecha de vencimiento
+  // Calcular estado de membresía basado en fecha de vencimiento en hora local
   const getMembershipStatus = (fechaFin: string | null): 'activa' | 'vencida' | 'por_vencer' => {
     if (!fechaFin) return 'activa';
-    
-    const today = new Date();
-    const endDate = new Date(fechaFin);
-    const diffTime = endDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+    const diffDays = diffDaysFromTodayLocal(fechaFin);
+    if (diffDays === null) return 'activa';
     if (diffDays < 0) return 'vencida';
     if (diffDays <= 7) return 'por_vencer';
     return 'activa';

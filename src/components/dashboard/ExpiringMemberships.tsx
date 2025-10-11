@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Calendar, RefreshCw } from "lucide-react";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
 import { useClientes } from "@/features/clientes/useClientes";
+import { diffDaysFromTodayLocal, formatISODate } from "@/lib/utils";
 
 export function ExpiringMemberships() {
   const { clientes } = useClientes();
@@ -18,14 +19,7 @@ export function ExpiringMemberships() {
 
   // Calcular días restantes localmente (sin RPC)
   const calcDaysRemaining = (fechaFin: string | null): number | null => {
-    if (!fechaFin) return null;
-    const today = new Date();
-    const endDate = new Date(fechaFin);
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const startOfEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-    const diffTime = startOfEnd.getTime() - startOfToday.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return diffDaysFromTodayLocal(fechaFin);
   };
 
   // Mostrar solo clientes con membresías por vencer (<= 7 días)
@@ -76,7 +70,7 @@ export function ExpiringMemberships() {
                         {cliente.nombre}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Vence: {new Date(cliente.fecha_fin!).toLocaleDateString()}
+                        Vence: {formatISODate(cliente.fecha_fin!)}
                       </p>
                     </div>
                   </div>

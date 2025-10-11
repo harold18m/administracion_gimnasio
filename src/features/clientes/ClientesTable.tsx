@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Edit, Trash2, Calendar, AlertTriangle } from "lucide-react";
 import { Cliente } from "./types";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
+import { formatISODate } from "@/lib/utils";
 
 interface ClientesTableProps {
   clientes: Cliente[];
@@ -128,7 +129,7 @@ export function ClientesTable({
                         </Badge>
                         {cliente.fecha_fin && (
                           <span className="text-xs text-muted-foreground">
-                            {new Date(cliente.fecha_fin).toLocaleDateString()}
+                            {formatISODate(cliente.fecha_fin)}
                           </span>
                         )}
                       </div>
@@ -235,7 +236,7 @@ export function ClientesTable({
                     {cliente.fecha_fin && (
                       <div className="pt-1">
                         <p className="text-xs text-muted-foreground">
-                          Vence: {new Date(cliente.fecha_fin).toLocaleDateString()}
+                          Vence: {formatISODate(cliente.fecha_fin)}
                         </p>
                       </div>
                     )}
