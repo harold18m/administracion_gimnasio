@@ -74,6 +74,7 @@ export interface Database {
           tipo_membresia: string | null
           fecha_inicio: string | null
           fecha_fin: string | null
+          codigo_barras: string | null
           estado: 'activa' | 'vencida' | 'suspendida'
           asistencias: number
           avatar_url: string | null
@@ -93,6 +94,7 @@ export interface Database {
           tipo_membresia?: string | null
           fecha_inicio?: string | null
           fecha_fin?: string | null
+          codigo_qr?: string | null
           estado?: 'activa' | 'vencida' | 'suspendida'
           asistencias?: number
           avatar_url?: string | null
@@ -112,6 +114,7 @@ export interface Database {
           tipo_membresia?: string | null
           fecha_inicio?: string | null
           fecha_fin?: string | null
+          codigo_qr?: string | null
           estado?: 'activa' | 'vencida' | 'suspendida'
           asistencias?: number
           avatar_url?: string | null

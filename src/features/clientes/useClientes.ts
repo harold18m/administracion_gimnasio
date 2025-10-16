@@ -97,6 +97,11 @@ export const useClientes = () => {
   };
 
   const saveCliente = async (values: any, options: { closeDialog?: boolean } = { closeDialog: true }) => {
+    const computeCodigoQR = (dni: string | null | undefined, id: string): string => {
+      const dniPart = (dni || '').replace(/\D/g, '').slice(-4);
+      const idPart = (id || '').split('-')[0].toUpperCase();
+      return `FIT-${dniPart ? dniPart + '-' : ''}${idPart}`;
+    };
     try {
       if (clienteActual) {
         // Editar cliente existente
@@ -109,6 +114,9 @@ export const useClientes = () => {
           membresia_id: values.membresia_id || null,
           fecha_inicio: values.fecha_inicio || null,
           fecha_fin: values.fecha_fin || null,
+          codigo_qr: (values.codigo_qr && values.codigo_qr.trim().length > 0)
+            ? values.codigo_qr
+            : computeCodigoQR(values.dni || null, clienteActual.id),
         };
 
         const { data, error } = await supabase
@@ -157,11 +165,21 @@ export const useClientes = () => {
           .single();
 
         if (error) throw error;
+        // Autogenerar código de barras basado en datos del cliente ya creado
+        const generado = computeCodigoQR(values.dni || null, data.id);
+        const { data: updated, error: errorCode } = await supabase
+          .from('clientes')
+          .update({ codigo_qr: generado })
+          .eq('id', data.id)
+          .select()
+          .single();
 
-        setClientes([data, ...clientes]);
+        if (errorCode) throw errorCode;
+
+        setClientes([updated, ...clientes]);
         toast({
           title: "Cliente agregado",
-          description: "El nuevo cliente ha sido agregado correctamente",
+          description: `Se generó el código ${generado} automáticamente.`,
         });
 
         if (options.closeDialog) {
@@ -169,7 +187,7 @@ export const useClientes = () => {
           setClienteActual(null);
         }
 
-        return data;
+        return updated;
       }
     } catch (err) {
       console.error('Error al guardar cliente:', err);

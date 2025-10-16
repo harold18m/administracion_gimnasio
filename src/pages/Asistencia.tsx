@@ -22,13 +22,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Search, 
-  Fingerprint, 
   UserCheck, 
   Clock, 
   Calendar, 
   CheckCircle, 
-  XCircle 
+  XCircle,
+  QrCode as QrCodeIcon
 } from "lucide-react";
+import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
 import { formatISODate } from "@/lib/utils";
@@ -44,34 +45,13 @@ const estadoStyle = {
 export default function Asistencia() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dniInput, setDniInput] = useState("");
+  const [codigoInput, setCodigoInput] = useState("");
+  const [scanActive, setScanActive] = useState(false);
   const [clientes, setClientes] = useState<Database["public"]["Tables"]["clientes"]["Row"][]>([]);
   const [asistencias, setAsistencias] = useState<Database["public"]["Tables"]["asistencias"]["Row"][]>([]);
-  const [modoAsistencia, setModoAsistencia] = useState<"huella" | "dni">("dni");
+  const [modoAsistencia, setModoAsistencia] = useState<"qr" | "dni">("dni");
   const { toast } = useToast();
-  const AGENT_URL = (import.meta as any).env?.VITE_AGENT_URL || "http://localhost:5599";
-  const [isVerificando, setIsVerificando] = useState(false);
-  const [health, setHealth] = useState<{ helperOk: boolean; deviceConnected: boolean }>({ helperOk: false, deviceConnected: false });
-  
-  useEffect(() => {
-    let mounted = true;
-    const check = async () => {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(`${AGENT_URL}/health`, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error("Agente no disponible");
-        const payload = await res.json();
-        if (mounted) setHealth({ helperOk: payload?.helper === "ok", deviceConnected: Boolean(payload?.device_connected) });
-      } catch {
-        if (mounted) setHealth({ helperOk: false, deviceConnected: false });
-      }
-    };
-    // chequeo inmediato y luego cada 2s
-    check();
-    const id = setInterval(check, 2000);
-    return () => { mounted = false; clearInterval(id); };
-  }, [AGENT_URL]);
+  // Huella deshabilitada: se elimina chequeo de agente
 
   useEffect(() => {
     loadClientes();
@@ -144,7 +124,7 @@ export default function Asistencia() {
     setAsistencias(data || []);
   };
 
-  const registrarAsistencia = async (cliente: Database["public"]["Tables"]["clientes"]["Row"], tipo: "huella" | "dni") => {
+  const registrarAsistencia = async (cliente: Database["public"]["Tables"]["clientes"]["Row"], tipo: "codigo" | "dni") => {
     if (cliente.estado === "vencida" || cliente.estado === "suspendida") {
       toast({
         variant: "destructive",
@@ -215,6 +195,7 @@ export default function Asistencia() {
     });
 
     setDniInput("");
+    setCodigoInput("");
   };
 
   const registrarPorDNI = async () => {
@@ -253,165 +234,29 @@ export default function Asistencia() {
 
     await registrarAsistencia(cliente, "dni");
   };
-
-  // Sustituye la simulación de huella por identificación real via agente
-  const verificarHuella = async () => {
-    try {
-      setIsVerificando(true);
-      // Modo simulación si el lector no está disponible
-      if (!(health.helperOk && health.deviceConnected)) {
-        await simularHuella();
-        return;
-      }
-      // 1) Verificar salud del agente
-      {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(`${AGENT_URL}/health`, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error("Agente no disponible");
-        const payload = await res.json();
-        if (payload?.helper !== "ok" || !payload?.device_connected) {
-          toast({
-            variant: "destructive",
-            title: "Lector no disponible",
-            description: "El agente o el lector no están listos. Verifica la conexión.",
-          });
-          return;
-        }
-      }
-  
-      toast({ title: "Huella detectada", description: "Intentando identificar..." });
-  
-      // 2) Enviar solicitud de identificación
-      const controller2 = new AbortController();
-      const timeout2 = setTimeout(() => controller2.abort(), 190000);
-      const resId = await fetch(`${AGENT_URL}/identify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-        signal: controller2.signal,
-      });
-      clearTimeout(timeout2);
-  
-      if (!resId.ok) {
-        let errJson: any = null;
-        try { errJson = await resId.json(); } catch {
-          // ignore JSON parse error
-        }
-  
-        if (resId.status === 404) {
-          const isNoTemplates = errJson?.error === "no_templates";
-          toast({
-            variant: "destructive",
-            title: "Sin coincidencia",
-            description: isNoTemplates ? "No hay plantillas registradas. Primero realiza el enrolamiento." : "No se encontró ninguna coincidencia con las plantillas registradas.",
-          });
-          return;
-        }
-  
-        if (errJson?.error === "supabase_not_configured") {
-          toast({
-            variant: "destructive",
-            title: "Agente sin Supabase",
-            description: "Configura SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el agente para poder identificar.",
-          });
-          return;
-        }
-  
-        if (errJson?.error === "helper_unavailable") {
-          toast({
-            variant: "destructive",
-            title: "Lector no disponible",
-            description: "El helper del lector no respondió. Revisa la conexión del dispositivo.",
-          });
-          return;
-        }
-  
-        if (errJson?.error === "supabase_fetch_failed" || errJson?.error === "supabase_fetch_exception") {
-          toast({
-            variant: "destructive",
-            title: "Error obteniendo plantillas",
-            description: errJson?.detail || "No se pudieron recuperar las plantillas desde Supabase.",
-          });
-          return;
-        }
-  
-        // Otros errores conocidos del identify
-        if (errJson?.error) {
-          toast({ variant: "destructive", title: "Error de identificación", description: String(errJson?.error) });
-          return;
-        }
-  
-        const text = await resId.text();
-        throw new Error(text || "Error en identificación");
-      }
-  
-      const agentPayload = await resId.json();
-      const match = agentPayload?.match;
-      if (!match?.cliente_id) {
-        toast({
-          variant: "destructive",
-          title: "Sin coincidencia",
-          description: "No se encontró ninguna coincidencia con las plantillas registradas.",
-        });
-        return;
-      }
-  
-      // 3) Cargar cliente por cliente_id
-      const { data: cliente, error } = await supabase
-        .from("clientes")
-        .select("id, nombre, dni, estado, avatar_url")
-        .eq("id", match.cliente_id)
-        .maybeSingle();
-  
-      if (error) {
-        toast({ variant: "destructive", title: "Error buscando cliente", description: error.message });
-        return;
-      }
-      if (!cliente) {
-        toast({ variant: "destructive", title: "Cliente no encontrado", description: "La coincidencia no corresponde a un cliente registrado." });
-        return;
-      }
-  
-      // 4) Registrar asistencia por huella
-      await registrarAsistencia(cliente, "huella");
-    } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error de identificación",
-        description: e?.message || "No se pudo completar la identificación.",
-      });
-    } finally {
-      setIsVerificando(false);
-    }
-  };
-
-  const simularHuella = async () => {
-    // Simula la lectura de una huella digital usando clientes reales
-    if (clientes.length === 0) {
-      await loadClientes();
-    }
-
-    const clienteAleatorio = clientes[Math.floor(Math.random() * clientes.length)];
-
-    if (!clienteAleatorio) {
-      toast({
-        variant: "destructive",
-        title: "No hay clientes",
-        description: "Agrega clientes para poder simular huella.",
-      });
+  const registrarPorQR = async () => {
+    if (!codigoInput) {
+      toast({ variant: "destructive", title: "Error de registro", description: "Ingresa un código válido." });
       return;
     }
 
-    toast({
-      title: "Huella detectada",
-      description: "Procesando identificación...",
-    });
+    const { data: cliente, error } = await supabase
+      .from("clientes")
+      .select("id, nombre, dni, estado, avatar_url")
+      .eq("codigo_qr", codigoInput)
+      .maybeSingle();
 
-    setTimeout(() => {
-      registrarAsistencia(clienteAleatorio, "huella");
-    }, 1500);
+    if (error) {
+      toast({ variant: "destructive", title: "Error buscando cliente", description: error.message });
+      return;
+    }
+
+    if (!cliente) {
+      toast({ variant: "destructive", title: "Cliente no encontrado", description: "No existe un cliente con el código ingresado." });
+      return;
+    }
+
+    await registrarAsistencia(cliente, "qr");
   };
 
   // Obtener clientes de las asistencias (unir asistencias con clientes)
@@ -429,7 +274,7 @@ export default function Asistencia() {
       const cliente = clientes.find((c) => c.id === asistencia.cliente_id);
       const fecha = new Date(asistencia.fecha_asistencia);
       const hora = fecha.toTimeString().split(" ")[0];
-      const tipo = asistencia.notas === "huella" ? "huella" : "dni";
+      const tipo = asistencia.notas === "qr" ? "qr" : "dni";
       return {
         asistencia: {
           id: asistencia.id,
@@ -446,7 +291,7 @@ export default function Asistencia() {
       <div className="flex flex-col space-y-2">
         <h2 className="text-3xl font-bold">Control de Asistencia</h2>
         <p className="text-muted-foreground">
-          Registro de entradas al gimnasio mediante huella digital o DNI
+          Registro de entradas al gimnasio mediante código QR o DNI
         </p>
       </div>
 
@@ -469,12 +314,12 @@ export default function Asistencia() {
                 Por DNI
               </Button>
               <Button
-                variant={modoAsistencia === "huella" ? "default" : "outline"}
+                variant={modoAsistencia === "qr" ? "default" : "outline"}
                 className="flex-1"
-                onClick={() => setModoAsistencia("huella")}
+                onClick={() => setModoAsistencia("qr")}
               >
-                <Fingerprint className="mr-2 h-4 w-4" />
-                Por Huella
+                <QrCodeIcon className="mr-2 h-4 w-4" />
+                Por QR
               </Button>
             </div>
 
@@ -494,20 +339,38 @@ export default function Asistencia() {
               </div>
             ) : (
               <div className="space-y-4">
-                <Button
-                  className="w-full h-20 text-lg"
-                  onClick={verificarHuella}
-                  disabled={isVerificando}
-                >
-                  <Fingerprint className="mr-2 h-6 w-6" />
-                  {isVerificando ? "Verificando..." : (health.helperOk && health.deviceConnected ? "Colocar dedo en el lector" : "Simular huella (sin lector)")}
-                </Button>
-                <div className="text-sm text-muted-foreground text-center">
-                  {health.helperOk ? (
-                    health.deviceConnected ? "Agente listo y lector conectado." : "El agente está listo, pero el lector no está conectado. Se usará simulación de huella."
-                  ) : (
-                    "Agente local no disponible. Verifica que esté ejecutándose."
-                  )}
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Escanea o ingresa el código QR"
+                    value={codigoInput}
+                    onChange={(e) => setCodigoInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') registrarPorQR(); }}
+                  />
+                  <Button onClick={registrarPorQR}>Verificar</Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant={scanActive ? "secondary" : "outline"} onClick={() => setScanActive((s) => !s)}>
+                    {scanActive ? "Detener cámara" : "Activar cámara"}
+                  </Button>
+                </div>
+                {scanActive && (
+                  <div className="rounded-md overflow-hidden border">
+                    <Scanner
+                      onScan={(detectedCodes) => {
+                        const value = Array.isArray(detectedCodes) ? (detectedCodes[0]?.rawValue || "") : "";
+                        if (value) {
+                          setCodigoInput(value);
+                          registrarPorQR();
+                        }
+                      }}
+                      onError={(error) => {
+                        console.error(error);
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="text-sm text-muted-foreground">
+                  Escanea con la cámara o usa un lector de QR; también puedes ingresar el código manualmente.
                 </div>
               </div>
             )}
@@ -598,12 +461,12 @@ export default function Asistencia() {
                             variant="outline"
                             className="flex items-center space-x-1"
                           >
-                            {asistencia.tipo === "huella" ? (
-                              <Fingerprint className="h-3 w-3 mr-1" />
+                            {asistencia.tipo === "qr" ? (
+                              <QrCodeIcon className="h-3 w-3 mr-1" />
                             ) : (
                               <UserCheck className="h-3 w-3 mr-1" />
                             )}
-                            {asistencia.tipo === "huella" ? "Huella" : "DNI"}
+                            {asistencia.tipo === "qr" ? "QR" : "DNI"}
                           </Badge>
                         </TableCell>
                       </TableRow>

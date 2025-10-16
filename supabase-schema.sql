@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.clientes (
     tipo_membresia VARCHAR(50),
     fecha_inicio TIMESTAMP WITH TIME ZONE,
     fecha_fin TIMESTAMP WITH TIME ZONE,
+    codigo_qr VARCHAR(64) UNIQUE,
     estado VARCHAR(20) DEFAULT 'activa' CHECK (estado IN ('activa', 'vencida', 'suspendida')),
     asistencias INTEGER DEFAULT 0,
     avatar_url TEXT,

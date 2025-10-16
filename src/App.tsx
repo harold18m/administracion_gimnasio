@@ -16,6 +16,7 @@ import Configuracion from "./pages/Configuracion";
 import Membresias from "./pages/Membresias";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
+import Kiosko from "./pages/Kiosko";
 import NotFound from "./pages/NotFound";
 import { useState, useEffect, createContext, useContext } from "react";
 
@@ -81,6 +82,7 @@ const App = () => {
               {/* Rutas Públicas */}
               <Route path="/login" element={<Login />} />
               <Route path="/registro" element={<Registro />} />
+              <Route path="/kiosko" element={<Kiosko />} />
               
               {/* Rutas Protegidas */}
               <Route element={
