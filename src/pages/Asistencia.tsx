@@ -33,6 +33,7 @@ import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
 import { formatISODate } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const estadoStyle = {
   activa: "bg-green-500",
@@ -47,6 +48,8 @@ export default function Asistencia() {
   const [dniInput, setDniInput] = useState("");
   const [codigoInput, setCodigoInput] = useState("");
   const [scanActive, setScanActive] = useState(false);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
   const [clientes, setClientes] = useState<Database["public"]["Tables"]["clientes"]["Row"][]>([]);
   const [asistencias, setAsistencias] = useState<Database["public"]["Tables"]["asistencias"]["Row"][]>([]);
   const [modoAsistencia, setModoAsistencia] = useState<"qr" | "dni">("dni");
@@ -57,6 +60,26 @@ export default function Asistencia() {
     loadClientes();
     loadAsistencias();
   }, []);
+
+  useEffect(() => {
+    const fetchDevices = async () => {
+      try {
+        if (navigator?.mediaDevices?.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videos = devices.filter((d) => d.kind === 'videoinput');
+          setVideoDevices(videos);
+          if (!selectedDeviceId && videos.length > 0) {
+            setSelectedDeviceId(videos[videos.length - 1]?.deviceId);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error enumerating devices', err);
+      }
+    };
+    if (scanActive) {
+      fetchDevices();
+    }
+  }, [scanActive]);
 
   const loadClientes = async () => {
     const { data, error } = await supabase
@@ -234,8 +257,9 @@ export default function Asistencia() {
 
     await registrarAsistencia(cliente, "dni");
   };
-  const registrarPorQR = async () => {
-    if (!codigoInput) {
+  const registrarPorQR = async (code?: string) => {
+    const normalized = String((code ?? codigoInput) || "").trim().toUpperCase();
+    if (!normalized) {
       toast({ variant: "destructive", title: "Error de registro", description: "Ingresa un código válido." });
       return;
     }
@@ -243,7 +267,7 @@ export default function Asistencia() {
     const { data: cliente, error } = await supabase
       .from("clientes")
       .select("id, nombre, dni, estado, avatar_url")
-      .eq("codigo_qr", codigoInput)
+      .eq("codigo_qr", normalized)
       .maybeSingle();
 
     if (error) {
@@ -252,7 +276,7 @@ export default function Asistencia() {
     }
 
     if (!cliente) {
-      toast({ variant: "destructive", title: "Cliente no encontrado", description: "No existe un cliente con el código ingresado." });
+      toast({ variant: "destructive", title: "Cliente no encontrado", description: "Verifica que el código escaneado coincida exactamente con el guardado en el perfil del cliente." });
       return;
     }
 
@@ -344,27 +368,49 @@ export default function Asistencia() {
                     placeholder="Escanea o ingresa el código QR"
                     value={codigoInput}
                     onChange={(e) => setCodigoInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') registrarPorQR(); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') registrarPorQR((e.target as HTMLInputElement).value); }}
                   />
-                  <Button onClick={registrarPorQR}>Verificar</Button>
+                  <Button onClick={() => registrarPorQR(codigoInput)}>Verificar</Button>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant={scanActive ? "secondary" : "outline"} onClick={() => setScanActive((s) => !s)}>
                     {scanActive ? "Detener cámara" : "Activar cámara"}
                   </Button>
+                  {scanActive && videoDevices.length > 0 && (
+                    <Select value={selectedDeviceId || ""} onValueChange={(id) => setSelectedDeviceId(id)}>
+                      <SelectTrigger className="w-full md:w-[280px]">
+                        <SelectValue placeholder="Selecciona una cámara" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {videoDevices.map((d) => (
+                          <SelectItem key={d.deviceId} value={d.deviceId}>
+                            {d.label || `Cámara ${d.deviceId.slice(0, 6)}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 {scanActive && (
                   <div className="rounded-md overflow-hidden border">
                     <Scanner
+                      constraints={selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: 'environment' }}
+                      scanDelay={300}
                       onScan={(detectedCodes) => {
                         const value = Array.isArray(detectedCodes) ? (detectedCodes[0]?.rawValue || "") : "";
-                        if (value) {
-                          setCodigoInput(value);
-                          registrarPorQR();
+                        const normalized = String(value).trim().toUpperCase();
+                        if (normalized) {
+                          setCodigoInput(normalized);
+                          registrarPorQR(normalized);
                         }
                       }}
                       onError={(error) => {
                         console.error(error);
+                        toast({
+                          variant: "destructive",
+                          title: "Error de cámara",
+                          description: typeof error === 'string' ? error : (error?.message || 'No se pudo acceder a la cámara')
+                        });
                       }}
                     />
                   </div>

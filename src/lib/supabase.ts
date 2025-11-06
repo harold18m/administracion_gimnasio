@@ -64,7 +64,7 @@ export interface Database {
         Row: {
           id: string
           nombre: string
-          email: string
+          email: string | null
           telefono: string
           dni: string | null
           fecha_nacimiento: string
@@ -84,7 +84,7 @@ export interface Database {
         Insert: {
           id?: string
           nombre: string
-          email: string
+          email?: string | null
           telefono: string
           dni?: string | null
           fecha_nacimiento: string
@@ -166,7 +166,7 @@ export interface Database {
         Returns: {
           id: string
           nombre: string
-          email: string
+          email: string | null
           telefono: string
           fecha_fin: string
           days_remaining: number

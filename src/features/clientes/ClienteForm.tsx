@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,7 +23,11 @@ import QRCode from "react-qr-code";
 
 export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
-  email: z.string().email({ message: "Correo electrónico inválido" }),
+  // Email opcional: permitir cadena vacía y validar formato solo si hay valor
+  email: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().email({ message: "Correo electrónico inválido" }).optional()
+  ),
   telefono: z.string().min(9, { message: "El teléfono debe tener al menos 9 caracteres" }),
   dni: z
     .string()
@@ -50,6 +54,7 @@ interface ClienteFormProps {
 }
 
 export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, membresiasDisponibles, saveCliente }: ClienteFormProps) {
+  const qrContainerRef = useRef<HTMLDivElement | null>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -124,10 +129,58 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
     onSubmit(values);
   });
   const handleGenerarCodigo = () => {
-    const rand = Math.random().toString(36).slice(2, 10).toUpperCase();
-    const code = `FIT-${rand}`;
+    const telefono = form.getValues("telefono") || "";
+    const telPart = telefono.replace(/\D/g, '').slice(-4);
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const code = `FIT-${telPart ? telPart + '-' : ''}${rand}`;
     form.setValue("codigo_qr", code, { shouldDirty: true, shouldTouch: true });
     toast({ title: "Código generado", description: `Se generó el código ${code}.` });
+  };
+
+  const handleDownloadQR = () => {
+    const code = form.getValues("codigo_qr") || "";
+    if (!code) {
+      toast({ variant: "destructive", title: "Sin código", description: "Genera o guarda el cliente para descargar el QR." });
+      return;
+    }
+    const svg = qrContainerRef.current?.querySelector('svg');
+    if (!svg) {
+      toast({ variant: "destructive", title: "QR no disponible", description: "No se encontró el SVG del QR." });
+      return;
+    }
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svg);
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `qr-${code}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Descarga iniciada", description: `Se descargó el archivo qr-${code}.svg` });
+  };
+
+  const handlePrintQR = () => {
+    const code = form.getValues("codigo_qr") || "";
+    if (!code) {
+      toast({ variant: "destructive", title: "Sin código", description: "Genera o guarda el cliente para imprimir el QR." });
+      return;
+    }
+    const svg = qrContainerRef.current?.querySelector('svg');
+    if (!svg) {
+      toast({ variant: "destructive", title: "QR no disponible", description: "No se encontró el SVG del QR." });
+      return;
+    }
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svg);
+    const printWindow = window.open('', '_blank', 'width=400,height=400');
+    if (!printWindow) return;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>QR ${code}</title></head><body style="display:flex;align-items:center;justify-content:center;height:100%;margin:0;">${svgStr}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   return (
@@ -288,17 +341,21 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                           <Button type="button" variant="secondary" onClick={handleGenerarCodigo}>Generar</Button>
                         </div>
                       </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">Si lo dejas vacío, se autogenera al guardar usando tu DNI e ID.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Si generas uno aquí se respetará; si lo dejas vacío, se autogenerará al guardar usando los últimos 4 dígitos de tu teléfono e ID.</p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="flex items-center justify-center p-2 border rounded-md bg-muted/30">
+                <div ref={qrContainerRef} className="flex items-center justify-center p-2 border rounded-md bg-muted/30">
                   {form.watch("codigo_qr") ? (
                     <QRCode value={form.watch("codigo_qr") || ""} size={120} />
                   ) : (
                     <span className="text-sm text-muted-foreground">Se visualizará el código tras generar o guardar el cliente</span>
                   )}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={handleDownloadQR} className="text-sm">Descargar QR</Button>
+                  <Button type="button" variant="outline" onClick={handlePrintQR} className="text-sm">Imprimir QR</Button>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:items-center sm:justify-end w-full">

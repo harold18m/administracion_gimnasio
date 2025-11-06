@@ -52,7 +52,7 @@ export const useClientes = () => {
   const filteredClientes = clientes.filter(
     (cliente) =>
       cliente.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      cliente.email.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (cliente.email?.toLowerCase().includes(busqueda.toLowerCase()) ?? false) ||
       cliente.telefono.includes(busqueda) ||
       (cliente.dni?.includes(busqueda) ?? false)
   );
@@ -97,26 +97,26 @@ export const useClientes = () => {
   };
 
   const saveCliente = async (values: any, options: { closeDialog?: boolean } = { closeDialog: true }) => {
-    const computeCodigoQR = (dni: string | null | undefined, id: string): string => {
-      const dniPart = (dni || '').replace(/\D/g, '').slice(-4);
+    const computeCodigoQR = (telefono: string | null | undefined, id: string): string => {
+      const telPart = (telefono || '').replace(/\D/g, '').slice(-4);
       const idPart = (id || '').split('-')[0].toUpperCase();
-      return `FIT-${dniPart ? dniPart + '-' : ''}${idPart}`;
+      return `FIT-${telPart ? telPart + '-' : ''}${idPart}`;
     };
     try {
       if (clienteActual) {
         // Editar cliente existente
         const updateData: ClienteUpdate = {
           nombre: values.nombre,
-          email: values.email,
+          email: values.email && values.email.trim().length > 0 ? values.email : null,
           telefono: values.telefono,
           dni: values.dni || null,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
           fecha_inicio: values.fecha_inicio || null,
           fecha_fin: values.fecha_fin || null,
-          codigo_qr: (values.codigo_qr && values.codigo_qr.trim().length > 0)
+          codigo_qr: ((values.codigo_qr && values.codigo_qr.trim().length > 0)
             ? values.codigo_qr
-            : computeCodigoQR(values.dni || null, clienteActual.id),
+            : computeCodigoQR(values.telefono || null, clienteActual.id))?.toUpperCase(),
         };
 
         const { data, error } = await supabase
@@ -147,7 +147,7 @@ export const useClientes = () => {
         // Agregar nuevo cliente
         const insertData: ClienteInsert = {
           nombre: values.nombre,
-          email: values.email,
+          email: values.email && values.email.trim().length > 0 ? values.email : null,
           telefono: values.telefono,
           dni: values.dni || null,
           fecha_nacimiento: values.fecha_nacimiento,
@@ -165,8 +165,11 @@ export const useClientes = () => {
           .single();
 
         if (error) throw error;
-        // Autogenerar código de barras basado en datos del cliente ya creado
-        const generado = computeCodigoQR(values.dni || null, data.id);
+        // Determinar código QR final: respetar el proporcionado en el formulario si existe,
+        // de lo contrario autogenerar basado en DNI e ID del cliente creado
+        const generado = (values.codigo_qr && values.codigo_qr.trim().length > 0)
+          ? values.codigo_qr.trim().toUpperCase()
+          : computeCodigoQR(values.telefono || null, data.id).toUpperCase();
         const { data: updated, error: errorCode } = await supabase
           .from('clientes')
           .update({ codigo_qr: generado })

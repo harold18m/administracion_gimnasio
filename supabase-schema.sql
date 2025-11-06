@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.membresias (
 CREATE TABLE IF NOT EXISTS public.clientes (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE,
     telefono VARCHAR(20) NOT NULL,
     dni VARCHAR(20) UNIQUE,
     fecha_nacimiento DATE NOT NULL,
