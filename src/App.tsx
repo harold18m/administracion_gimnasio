@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GymLayout } from "./components/GymLayout";
 import Dashboard from "./pages/Dashboard";
-import Ejercicios from "./pages/Ejercicios";
+import Rutinas from "./pages/Rutinas";
 import WhatsApp from "./pages/WhatsApp";
 import ChatBot from "./pages/ChatBot";
 import Clientes from "./pages/Clientes";
@@ -94,7 +94,8 @@ const App = () => {
                 <Route path="/asistencia" element={<Asistencia />} />
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/membresias" element={<Membresias />} />
-                <Route path="/ejercicios" element={<Ejercicios />} />
+                {/* Solo ruta de Rutinas */}
+                <Route path="/rutinas" element={<Rutinas />} />
                 <Route path="/whatsapp" element={<WhatsApp />} />
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/chatbot" element={<ChatBot />} />

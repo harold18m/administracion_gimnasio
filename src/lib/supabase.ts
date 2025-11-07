@@ -151,6 +151,114 @@ export interface Database {
           created_at?: string
         }
       }
+      , ejercicios: {
+        Row: {
+          id: string
+          nombre: string
+          categoria: 'fuerza' | 'cardio' | 'flexibilidad' | 'core' | 'equilibrio' | null
+          dificultad: 'principiante' | 'intermedio' | 'avanzado' | null
+          musculos: string[]
+          descripcion: string | null
+          imagen_url: string | null
+          video_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          categoria?: 'fuerza' | 'cardio' | 'flexibilidad' | 'core' | 'equilibrio' | null
+          dificultad?: 'principiante' | 'intermedio' | 'avanzado' | null
+          musculos?: string[]
+          descripcion?: string | null
+          imagen_url?: string | null
+          video_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          categoria?: 'fuerza' | 'cardio' | 'flexibilidad' | 'core' | 'equilibrio' | null
+          dificultad?: 'principiante' | 'intermedio' | 'avanzado' | null
+          musculos?: string[]
+          descripcion?: string | null
+          imagen_url?: string | null
+          video_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      , rutinas: {
+        Row: {
+          id: string
+          nombre: string
+          cliente_id: string | null
+          notas: string | null
+          dias: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          cliente_id?: string | null
+          notas?: string | null
+          dias?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          cliente_id?: string | null
+          notas?: string | null
+          dias?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      , rutina_ejercicios: {
+        Row: {
+          id: string
+          rutina_id: string
+          ejercicio_id: string
+          orden: number
+          series: number | null
+          repeticiones: string | null
+          tempo: string | null
+          descanso: string | null
+          notas: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          rutina_id: string
+          ejercicio_id: string
+          orden?: number
+          series?: number | null
+          repeticiones?: string | null
+          tempo?: string | null
+          descanso?: string | null
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          rutina_id?: string
+          ejercicio_id?: string
+          orden?: number
+          series?: number | null
+          repeticiones?: string | null
+          tempo?: string | null
+          descanso?: string | null
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Functions: {
       get_days_remaining: {
