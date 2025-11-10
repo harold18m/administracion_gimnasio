@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,8 @@ import { diffDaysFromTodayLocal, formatISODate } from "@/lib/utils";
 
 export function ExpiringMemberships() {
   const { clientes } = useClientes();
-  const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
+  const { getMembershipStatus, getStatusColor, getStatusText, renewMembership } = useMembershipExpiration();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   // Calcular días restantes localmente (sin RPC)
   const calcDaysRemaining = (fechaFin: string | null): number | null => {
@@ -89,8 +91,17 @@ export function ExpiringMemberships() {
                       size="sm"
                       className="h-6 w-6 p-0"
                       title="Renovar membresía"
+                      onClick={async () => {
+                        setLoadingId(cliente.id);
+                        try {
+                          await renewMembership(cliente.id);
+                        } finally {
+                          setLoadingId(null);
+                        }
+                      }}
+                      disabled={loadingId === cliente.id}
                     >
-                      <RefreshCw className="h-3 w-3" />
+                      <RefreshCw className={`h-3 w-3 ${loadingId === cliente.id ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
                 </div>

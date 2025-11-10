@@ -1,5 +1,6 @@
 
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Edit, Trash2, Calendar, AlertTriangle } from "lucide-react";
+import { Search, Edit, Trash2, Calendar, AlertTriangle, RefreshCw } from "lucide-react";
 import { Cliente } from "./types";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
 import { formatISODate } from "@/lib/utils";
@@ -38,7 +39,8 @@ export function ClientesTable({
   onEdit,
   onDelete,
 }: ClientesTableProps) {
-  const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
+  const { getMembershipStatus, getStatusColor, getStatusText, renewMembership } = useMembershipExpiration();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   return (
     <Card>
@@ -136,6 +138,24 @@ export function ClientesTable({
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        {status === 'vencida' && cliente.membresia_id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Renovar membresía"
+                            onClick={async () => {
+                              setLoadingId(cliente.id);
+                              try {
+                                await renewMembership(cliente.id);
+                              } finally {
+                                setLoadingId(null);
+                              }
+                            }}
+                            disabled={loadingId === cliente.id}
+                          >
+                            <RefreshCw className={`h-4 w-4 ${loadingId === cliente.id ? 'animate-spin' : ''}`} />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -232,6 +252,25 @@ export function ClientesTable({
                         {status === 'active' && <Calendar className="h-3 w-3" />}
                         <span>{getStatusText(status)}</span>
                       </Badge>
+                      {status === 'vencida' && cliente.membresia_id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          title="Renovar"
+                          onClick={async () => {
+                            setLoadingId(cliente.id);
+                            try {
+                              await renewMembership(cliente.id);
+                            } finally {
+                              setLoadingId(null);
+                            }
+                          }}
+                          disabled={loadingId === cliente.id}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${loadingId === cliente.id ? 'animate-spin' : ''}`} />
+                        </Button>
+                      )}
                     </div>
                     {cliente.fecha_fin && (
                       <div className="pt-1">
