@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GymLayout } from "./components/GymLayout";
 import Dashboard from "./pages/Dashboard";
 import Rutinas from "./pages/Rutinas";
-import WhatsApp from "./pages/WhatsApp";
 import ChatBot from "./pages/ChatBot";
 import Clientes from "./pages/Clientes";
 import Asistencia from "./pages/Asistencia";
@@ -96,7 +95,7 @@ const App = () => {
                 <Route path="/membresias" element={<Membresias />} />
                 {/* Solo ruta de Rutinas */}
                 <Route path="/rutinas" element={<Rutinas />} />
-                <Route path="/whatsapp" element={<WhatsApp />} />
+              {/* Página de WhatsApp eliminada */}
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/chatbot" element={<ChatBot />} />
                 <Route path="/configuracion" element={<Configuracion />} />

@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WhatsAppSetupPanel } from "@/features/whatsapp/WhatsAppSetupPanel";
-import { Settings, MessageSquare, Users, Dumbbell } from "lucide-react";
+import { Settings, Users, Dumbbell } from "lucide-react";
 
 const Configuracion = () => {
   return (
@@ -16,12 +15,8 @@ const Configuracion = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="whatsapp" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="whatsapp" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            WhatsApp
-          </TabsTrigger>
+      <Tabs defaultValue="clientes" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="clientes" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Clientes
@@ -35,20 +30,6 @@ const Configuracion = () => {
             General
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="whatsapp" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración de WhatsApp Business</CardTitle>
-              <CardDescription>
-                Configura la integración con WhatsApp Business API para automatizar las comunicaciones con tus clientes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <WhatsAppSetupPanel />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="clientes" className="space-y-4">
           <Card>

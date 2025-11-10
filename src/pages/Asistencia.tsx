@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -317,6 +318,13 @@ export default function Asistencia() {
         <p className="text-muted-foreground">
           Registro de entradas al gimnasio mediante código QR o DNI
         </p>
+        <div className="pt-2">
+          <Link to="/kiosko" target="_blank" rel="noopener noreferrer">
+            <Button>
+              Abrir Kiosko
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

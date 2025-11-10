@@ -37,7 +37,6 @@ const sidebarItems: SidebarItem[] = [
   { icon: Users, label: 'Clientes', href: '/clientes' },
   { icon: CreditCard, label: 'Membresías', href: '/membresias' },
   { icon: Dumbbell, label: 'Rutinas', href: '/rutinas' },
-  { icon: MessageSquare, label: 'WhatsApp', href: '/whatsapp' },
   { icon: Calendar, label: 'Calendario', href: '/calendario' },
   { icon: Bot, label: 'ChatBot', href: '/chatbot' },
   { icon: Settings, label: 'Configuración', href: '/configuracion' },
