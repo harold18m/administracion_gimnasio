@@ -49,3 +49,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+ 
+# SLK20R agent and fingerprint API (removed)
+agent/
+api/fingerprint/
