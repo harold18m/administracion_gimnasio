@@ -82,6 +82,7 @@ export const useRutinas = () => {
       .from('rutina_ejercicios')
       .select('*, ejercicios(*)')
       .eq('rutina_id', rutinaId)
+      .order('dia', { ascending: true })
       .order('orden', { ascending: true });
     if (dErr) throw dErr;
     return { rutina, detalle } as const;

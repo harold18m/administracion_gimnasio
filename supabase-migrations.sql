@@ -34,6 +34,8 @@ create table if not exists public.rutina_ejercicios (
   id uuid primary key default gen_random_uuid(),
   rutina_id uuid references public.rutinas(id) on delete cascade,
   ejercicio_id uuid references public.ejercicios(id) on delete restrict,
+  -- Día asignado dentro de la rutina (1, 2, 3, etc.)
+  dia text,
   orden int not null default 1,
   series int,
   repeticiones text, -- flexible: "8-12" o "AMRAP"
@@ -49,6 +51,8 @@ create index if not exists idx_ejercicios_nombre on public.ejercicios (nombre);
 create index if not exists idx_rutinas_cliente on public.rutinas (cliente_id);
 create index if not exists idx_rutina_ejercicios_rutina on public.rutina_ejercicios (rutina_id);
 create index if not exists idx_rutina_ejercicios_orden on public.rutina_ejercicios (rutina_id, orden);
+-- Índice por día para consultas agrupadas
+create index if not exists idx_rutina_ejercicios_dia on public.rutina_ejercicios (rutina_id, dia);
 
 -- Trigger de updated_at
 create or replace function public.set_updated_at()

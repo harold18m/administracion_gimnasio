@@ -223,6 +223,7 @@ export interface Database {
           id: string
           rutina_id: string
           ejercicio_id: string
+          dia: string | null
           orden: number
           series: number | null
           repeticiones: string | null
@@ -236,6 +237,7 @@ export interface Database {
           id?: string
           rutina_id: string
           ejercicio_id: string
+          dia?: string | null
           orden?: number
           series?: number | null
           repeticiones?: string | null
@@ -249,6 +251,7 @@ export interface Database {
           id?: string
           rutina_id?: string
           ejercicio_id?: string
+          dia?: string | null
           orden?: number
           series?: number | null
           repeticiones?: string | null
