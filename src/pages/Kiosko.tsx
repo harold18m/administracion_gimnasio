@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
-import { Camera, Loader2, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle } from "lucide-react";
+import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle } from "lucide-react";
 
 export default function Kiosko() {
   const { toast } = useToast();
@@ -377,8 +377,6 @@ export default function Kiosko() {
           )}
 
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Buscando código QR...</span>
           </div>
 
           
