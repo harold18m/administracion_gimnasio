@@ -16,6 +16,7 @@ import { ExpiringMemberships } from "@/components/dashboard/ExpiringMemberships"
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
+import { diffDaysFromTodayLocal } from "@/lib/utils";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -23,6 +24,7 @@ export default function Dashboard() {
     asistenciasHoy: 0,
     clasesHoy: 0,
     ingresosHoy: 0,
+    membresiasActivas: 0,
   });
 
   useEffect(() => {
@@ -37,6 +39,16 @@ export default function Dashboard() {
         const { count: clientesCount } = await supabase
           .from("clientes")
           .select("*", { count: "exact", head: true });
+
+        // Obtener fechas de fin para calcular membresías activas localmente (no vencidas)
+        const { data: clientesFechas } = await supabase
+          .from("clientes")
+          .select("id, fecha_fin");
+        const activosCount = (clientesFechas || []).filter((c: any) => {
+          const diff = diffDaysFromTodayLocal(c.fecha_fin);
+          // Si no hay fecha_fin, consideramos activa
+          return diff === null || diff >= 0;
+        }).length;
 
         const { count: asistenciasCount } = await supabase
           .from("asistencias")
@@ -64,6 +76,7 @@ export default function Dashboard() {
           asistenciasHoy: asistenciasCount || 0,
           clasesHoy: clasesCount || 0,
           ingresosHoy: ingresosSuma || 0,
+          membresiasActivas: activosCount || 0,
         });
       } catch (error) {
         console.error("Error al cargar métricas del dashboard:", error);
@@ -110,6 +123,13 @@ export default function Dashboard() {
           icon={TrendingUp} 
           description="Ingresos estimados del día"
           iconColor="text-green-500"
+        />
+        <StatCard 
+          title="Membresías Activas" 
+          value={String(stats.membresiasActivas)} 
+          icon={Dumbbell} 
+          description="No vencidas; incluye por vencer"
+          iconColor="text-gym-orange"
         />
       </div>
       

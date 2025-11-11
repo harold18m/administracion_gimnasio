@@ -32,6 +32,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -71,7 +81,7 @@ export default function Rutinas() {
   const { toast } = useToast();
   const { ejercicios, filteredEjercicios, busqueda, setBusqueda, createEjercicio, updateEjercicio, deleteEjercicio } = useEjercicios();
   const { clientes } = useClientes();
-  const { rutinas, fetchRutinas, createRutina, getRutinaDetalle, updateRutina } = useRutinas();
+  const { rutinas, fetchRutinas, createRutina, getRutinaDetalle, updateRutina, deleteRutina } = useRutinas();
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [ejercicioActualId, setEjercicioActualId] = useState<string | null>(null);
   const ejercicioActual = useMemo(() => ejercicios.find(e => e.id === ejercicioActualId) || null, [ejercicios, ejercicioActualId]);
@@ -93,6 +103,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
   const [rutinaVista, setRutinaVista] = useState<any>(null);
   const rutinaExportRef = useRef<HTMLDivElement | null>(null);
   const [rutinaAsignaciones, setRutinaAsignaciones] = useState<Record<string, string>>({});
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [rutinaToDelete, setRutinaToDelete] = useState<string | null>(null);
   
   const abrirNuevoEjercicio = () => {
     setEjercicioActualId(null);
@@ -377,7 +389,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                             const ej = ejercicios.find(e => e.id === item.ejercicio_id);
                             const idx = rutinaDetalle.findIndex(d => d === item);
                             return (
-                              <div key={`dia-${dia}-idx-${idx}`} className="grid md:grid-cols-7 gap-2 items-end">
+                              <div key={`dia-${dia}-idx-${idx}`} className="grid md:grid-cols-6 gap-2 items-end">
                                 <div className="md:col-span-2">
                                   <Select value={item.ejercicio_id} onValueChange={(v) => {
                                     setRutinaDetalle(prev => {
@@ -394,14 +406,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                 </SelectContent>
                               </Select>
                             </div>
-                            <Input className="h-9 text-sm" type="number" placeholder="Orden" value={item.orden} onChange={(e) => {
-                              const val = e.target.value;
-                              setRutinaDetalle(prev => {
-                                const next = [...prev];
-                                  next[idx].orden = val === '' ? 0 : parseInt(val, 10) || 0;
-                                  return next;
-                              });
-                            }} />
+                            {/* Campo Orden eliminado por simplicidad */}
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
                               setRutinaDetalle(prev => {
@@ -458,7 +463,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                       {rutinaDetalle.map((item, idx) => {
                         const ej = ejercicios.find(e => e.id === item.ejercicio_id);
                         return (
-                          <div key={idx} className="grid md:grid-cols-7 gap-2 items-end">
+                          <div key={idx} className="grid md:grid-cols-6 gap-2 items-end">
                             <div className="md:col-span-2">
                               <Select value={item.ejercicio_id} onValueChange={(v) => {
                                 setRutinaDetalle(prev => {
@@ -475,14 +480,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                 </SelectContent>
                               </Select>
                             </div>
-                            <Input className="h-9 text-sm" type="number" placeholder="Orden" value={item.orden} onChange={(e) => {
-                              const val = e.target.value;
-                              setRutinaDetalle(prev => {
-                                const next = [...prev];
-                                next[idx].orden = val === '' ? 0 : parseInt(val, 10) || 0;
-                                return next;
-                              });
-                            }} />
+                            {/* Campo Orden eliminado por simplicidad */}
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
                               setRutinaDetalle(prev => {
@@ -592,23 +590,33 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                           Asignar
                         </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        onClick={async () => {
-                          setVerRutinaAbierto(true);
-                          setVerRutinaLoading(true);
-                          try {
-                            const res = await getRutinaDetalle(r.id);
-                            setRutinaVista(res);
-                          } catch (err) {
-                            toast({ variant: "destructive", title: "Error", description: "No se pudo cargar el detalle de la rutina" });
-                          } finally {
-                            setVerRutinaLoading(false);
-                          }
-                        }}
-                      >
-                        Ver
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            setVerRutinaAbierto(true);
+                            setVerRutinaLoading(true);
+                            try {
+                              const res = await getRutinaDetalle(r.id);
+                              setRutinaVista(res);
+                            } catch (err) {
+                              toast({ variant: "destructive", title: "Error", description: "No se pudo cargar el detalle de la rutina" });
+                            } finally {
+                              setVerRutinaLoading(false);
+                            }
+                          }}
+                        >
+                          Ver
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => { setRutinaToDelete(r.id); setConfirmDeleteOpen(true); }}
+                          aria-label="Eliminar rutina"
+                          title="Eliminar rutina"
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
                     </CardFooter>
                   </Card>
                 ))}
@@ -645,7 +653,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                         return (
                           <div className="space-y-3 mt-2">
                             {detalle.map((item: any, idx: number) => (
-                              <div key={idx} className="grid md:grid-cols-6 gap-2 items-center">
+                              <div key={idx} className="grid md:grid-cols-4 gap-2 items-center">
                                 <div className="md:col-span-2 flex items-center gap-2">
                                   {item.ejercicios?.imagen_url && (
                                     <img
@@ -669,14 +677,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                   <Label className="text-xs">Reps</Label>
                                   <div>{item.repeticiones ?? '-'}</div>
                                 </div>
-                                <div>
-                                  <Label className="text-xs">Tempo</Label>
-                                  <div>{item.tempo ?? '-'}</div>
-                                </div>
-                                <div>
-                                  <Label className="text-xs">Descanso</Label>
-                                  <div>{item.descanso ?? '-'}</div>
-                                </div>
+                                {/* Campos Tempo y Descanso ocultos en la vista */}
                               </div>
                             ))}
                           </div>
@@ -696,7 +697,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                               <div className="font-semibold">Día {diaKey}</div>
                               <div className="space-y-3">
                                 {grupos[diaKey].map((item: any, idx: number) => (
-                                  <div key={`v-${diaKey}-${idx}`} className="grid md:grid-cols-6 gap-2 items-center">
+                                  <div key={`v-${diaKey}-${idx}`} className="grid md:grid-cols-4 gap-2 items-center">
                                     <div className="md:col-span-2 flex items-center gap-2">
                                       {item.ejercicios?.imagen_url && (
                                         <img
@@ -720,14 +721,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                       <Label className="text-xs">Reps</Label>
                                       <div>{item.repeticiones ?? '-'}</div>
                                     </div>
-                                    <div>
-                                      <Label className="text-xs">Tempo</Label>
-                                      <div>{item.tempo ?? '-'}</div>
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">Descanso</Label>
-                                      <div>{item.descanso ?? '-'}</div>
-                                    </div>
+                                    {/* Campos Tempo y Descanso ocultos en la vista */}
                                   </div>
                                 ))}
                               </div>
@@ -815,6 +809,35 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar rutina?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. Se eliminará la rutina seleccionada.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!rutinaToDelete) return;
+                    try {
+                      await deleteRutina(rutinaToDelete);
+                      toast({ title: 'Rutina eliminada', description: 'La rutina fue eliminada correctamente.' });
+                      fetchRutinas(rutinaClienteId || undefined);
+                    } catch {}
+                    finally {
+                      setConfirmDeleteOpen(false);
+                      setRutinaToDelete(null);
+                    }
+                  }}
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
     </div>

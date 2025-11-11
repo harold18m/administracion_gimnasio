@@ -10,6 +10,7 @@ import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, Aler
 export default function Kiosko() {
   const { toast } = useToast();
   const [scanActive] = useState(true);
+  const [horaActual, setHoraActual] = useState<string>(new Date().toLocaleTimeString());
   
   const [ultimoCliente, setUltimoCliente] = useState<Database["public"]["Tables"]["clientes"]["Row"] | null>(null);
   const [ultimaHora, setUltimaHora] = useState<string>("");
@@ -181,8 +182,23 @@ export default function Kiosko() {
     }
   };
 
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setHoraActual(new Date().toLocaleTimeString());
+    }, 1000);
+    return () => {
+      clearInterval(id);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-neutral-950 text-white flex flex-col items-center p-6">
+      {/* Hora en la esquina superior derecha */}
+      <div className="fixed top-4 right-6 z-30">
+        <span className="px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900 text-neutral-100 font-mono text-3xl tracking-tight shadow-sm">
+          {horaActual}
+        </span>
+      </div>
       <div className="flex flex-col items-center mb-6">
         <div className="h-12 w-12 rounded-full bg-orange-500/10 border border-orange-500/40 flex items-center justify-center mb-2">
           <Camera className="h-6 w-6 text-orange-400" />
@@ -380,10 +396,6 @@ export default function Kiosko() {
           </div>
 
           
-
-          {!ultimoCliente && (
-            <div className="text-center text-neutral-400">Aún no hay registros en esta sesión.</div>
-          )}
         </CardContent>
       </Card>
     </div>

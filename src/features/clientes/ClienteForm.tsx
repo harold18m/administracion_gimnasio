@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,6 +55,12 @@ interface ClienteFormProps {
 
 export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, membresiasDisponibles, saveCliente }: ClienteFormProps) {
   const qrContainerRef = useRef<HTMLDivElement | null>(null);
+  const [step, setStep] = useState<number>(0);
+  const steps = [
+    { key: 'datos', label: 'Datos personales' },
+    { key: 'membresia', label: 'Membresía y fechas' },
+    { key: 'qr', label: 'Código QR' },
+  ];
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -128,6 +134,24 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
   const handleSubmit = form.handleSubmit((values) => {
     onSubmit(values);
   });
+
+  const validateCurrentStep = async () => {
+    if (step === 0) {
+      return form.trigger(["nombre", "email", "telefono", "dni", "fecha_nacimiento"]);
+    }
+    if (step === 1) {
+      return form.trigger(["membresia_id", "fecha_inicio", "fecha_fin"]);
+    }
+    return true;
+  };
+
+  const goNext = async () => {
+    const valid = await validateCurrentStep();
+    if (!valid) return;
+    setStep((s) => Math.min(s + 1, steps.length - 1));
+  };
+
+  const goPrev = () => setStep((s) => Math.max(s - 1, 0));
   const handleGenerarCodigo = () => {
     const telefono = form.getValues("telefono") || "";
     const telPart = telefono.replace(/\D/g, '').slice(-4);
@@ -148,18 +172,52 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
       toast({ variant: "destructive", title: "QR no disponible", description: "No se encontró el SVG del QR." });
       return;
     }
+    // Convertir el SVG del QR a PNG usando un canvas, con marco blanco
     const serializer = new XMLSerializer();
     const svgStr = serializer.serializeToString(svg);
-    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qr-${code}.svg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({ title: "Descarga iniciada", description: `Se descargó el archivo qr-${code}.svg` });
+    const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      // Escalar para mejor resolución
+      const baseSize = Number(svg.getAttribute('width')) || svg.clientWidth || 120;
+      const scale = 4;
+      const width = baseSize * scale;
+      const height = baseSize * scale;
+      // Marco blanco (10% del tamaño o mínimo 32px)
+      const padding = Math.max(32, Math.round(Math.min(width, height) * 0.1));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width + padding * 2;
+      canvas.height = height + padding * 2;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear el lienzo para exportar.' });
+        return;
+      }
+      // Fondo blanco para JPG
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, padding, padding, width, height);
+
+      const pngData = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = pngData;
+      a.download = `qr-${code}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'Descarga iniciada', description: `Se descargó el archivo qr-${code}.png` });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast({ variant: 'destructive', title: 'Error al exportar', description: 'No se pudo convertir el QR a imagen PNG.' });
+    };
+    img.src = url;
   };
 
   const handlePrintQR = () => {
@@ -196,10 +254,31 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
               : "Completa los datos para registrar un nuevo cliente"}
           </DialogDescription>
         </DialogHeader>
+        {/* Stepper */}
+        <div className="mb-3 md:mb-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            {steps.map((st, idx) => (
+              <div key={st.key} className="flex items-center gap-2">
+                <div className={`px-2.5 py-1 rounded-md border text-xs md:text-sm ${
+                  idx === step
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : idx < step
+                    ? 'border-green-600 bg-green-900/20 text-green-400'
+                    : 'border-neutral-700 bg-neutral-800 text-neutral-300'
+                }`}>
+                  {st.label}
+                </div>
+                {idx < steps.length - 1 && (
+                  <div className="w-6 md:w-8 h-[1px] bg-neutral-700" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Columna 1: Datos personales */}
+            {/* Paso 0: Datos personales */}
+            {step === 0 && (
               <div className="space-y-3 md:space-y-4">
                 <FormField
                   control={form.control}
@@ -267,8 +346,10 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                   )}
                 />
               </div>
+            )}
 
-              {/* Columna 2: Membresía y fechas */}
+            {/* Paso 1: Membresía y fechas */}
+            {step === 1 && (
               <div className="space-y-3 md:space-y-4">
                 <FormField
                   control={form.control}
@@ -326,47 +407,66 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                   )}
                 />
               </div>
-            </div>
-            <DialogFooter className="flex-col gap-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-                <FormField
-                  control={form.control}
-                  name="codigo_qr"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Código QR</FormLabel>
-                      <FormControl>
-                        <div className="flex gap-2">
-                          <Input placeholder="FIT-XXXXXX" className="text-sm" {...field} />
-                          <Button type="button" variant="secondary" onClick={handleGenerarCodigo}>Generar</Button>
-                        </div>
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">Si generas uno aquí se respetará; si lo dejas vacío, se autogenerará al guardar usando los últimos 4 dígitos de tu teléfono e ID.</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div ref={qrContainerRef} className="flex items-center justify-center p-2 border rounded-md bg-muted/30">
-                  {form.watch("codigo_qr") ? (
-                    <QRCode value={form.watch("codigo_qr") || ""} size={120} />
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Se visualizará el código tras generar o guardar el cliente</span>
-                  )}
+            )}
+
+            {/* Paso 2: Código QR */}
+            {step === 2 && (
+              <div className="space-y-3 md:space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                  <FormField
+                    control={form.control}
+                    name="codigo_qr"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Código QR</FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2">
+                            <Input placeholder="FIT-XXXXXX" className="text-sm" {...field} />
+                            <Button type="button" variant="secondary" onClick={handleGenerarCodigo}>Generar</Button>
+                          </div>
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground mt-1">Si generas uno aquí se respetará; si lo dejas vacío, se autogenerará al guardar usando los últimos 4 dígitos de tu teléfono e ID.</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div ref={qrContainerRef} className="flex items-center justify-center p-2 border rounded-md bg-muted/30">
+                    {form.watch("codigo_qr") ? (
+                      <QRCode value={form.watch("codigo_qr") || ""} size={120} />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Se visualizará el código tras generar o guardar el cliente</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={handleDownloadQR} className="text-sm">Descargar QR</Button>
                   <Button type="button" variant="outline" onClick={handlePrintQR} className="text-sm">Imprimir QR</Button>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:items-center sm:justify-end w-full">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" className="w-full sm:w-auto text-sm">
-                    Cancelar
-                  </Button>
-                </DialogClose>
-                <Button type="submit" className="w-full sm:w-auto text-sm" disabled={form.formState.isSubmitting}>
-                  {clienteActual ? "Actualizar" : "Guardar"}
-                </Button>
+            )}
+
+            {/* Navegación */}
+            <DialogFooter className="flex-col gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:items-center sm:justify-between w-full">
+                <div className="flex gap-2">
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" className="text-sm">
+                      Cancelar
+                    </Button>
+                  </DialogClose>
+                </div>
+                <div className="flex gap-2">
+                  {step > 0 && (
+                    <Button type="button" variant="outline" onClick={goPrev} className="text-sm">Atrás</Button>
+                  )}
+                  {step < steps.length - 1 ? (
+                    <Button type="button" onClick={goNext} className="text-sm">Siguiente</Button>
+                  ) : (
+                    <Button type="submit" className="text-sm" disabled={form.formState.isSubmitting}>
+                      {clienteActual ? "Actualizar" : "Guardar"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </DialogFooter>
           </form>
