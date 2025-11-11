@@ -48,6 +48,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +59,7 @@ import { useClientes } from "@/features/clientes/useClientes";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type EjercicioRow = ReturnType<typeof useEjercicios>["ejercicios"][number];
 type ClienteRow = ReturnType<typeof useClientes>["clientes"][number];
@@ -86,8 +89,7 @@ export default function Rutinas() {
   const [ejercicioActualId, setEjercicioActualId] = useState<string | null>(null);
   const ejercicioActual = useMemo(() => ejercicios.find(e => e.id === ejercicioActualId) || null, [ejercicios, ejercicioActualId]);
   const [exNombre, setExNombre] = useState("");
-  const [exCategoria, setExCategoria] = useState<string | undefined>(undefined);
-  const [exMusculosStr, setExMusculosStr] = useState("");
+  const [exCategoria, setExCategoria] = useState<string | undefined>(undefined); // ahora representa el músculo seleccionado
   const [exDescripcion, setExDescripcion] = useState("");
 const [exImagenUrl, setExImagenUrl] = useState<string>("");
   const ejerciciosFiltrados = filteredEjercicios;
@@ -105,31 +107,49 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
   const [rutinaAsignaciones, setRutinaAsignaciones] = useState<Record<string, string>>({});
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [rutinaToDelete, setRutinaToDelete] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const imageSizeClass = exporting ? 'h-20 w-20' : 'h-12 w-12';
+
+  const waitImagesLoaded = async (node?: HTMLDivElement | null) => {
+    if (!node) return;
+    const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+    await Promise.all(
+      imgs.map((img) => {
+        if ((img as any).decode) {
+          try { return (img as any).decode(); } catch { /* fallback below */ }
+        }
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+      })
+    );
+  };
   
   const abrirNuevoEjercicio = () => {
     setEjercicioActualId(null);
     setExNombre(""); setExCategoria(undefined);
-    setExMusculosStr(""); setExDescripcion(""); setExImagenUrl("");
+    setExDescripcion(""); setExImagenUrl("");
     setDialogoAbierto(true);
   };
   const abrirEditarEjercicio = (id: string) => {
     setEjercicioActualId(id);
     const ej = ejercicios.find(e => e.id === id);
     setExNombre(ej?.nombre || "");
-    setExCategoria(ej?.categoria || undefined);
-    setExMusculosStr((ej?.musculos || []).join(', '));
+    setExCategoria((ej?.musculos && ej.musculos[0]) || undefined);
     setExDescripcion(ej?.descripcion || "");
     setExImagenUrl(ej?.imagen_url || "");
     setDialogoAbierto(true);
   };
   const guardarEjercicio = async () => {
     if (!exNombre.trim()) { toast({ variant:'destructive', title:'Nombre requerido', description:'Ingresa el nombre del ejercicio' }); return; }
-    const musculos = exMusculosStr.split(',').map(s => s.trim()).filter(Boolean);
     try {
       if (!ejercicioActual) {
-        await createEjercicio({ nombre: exNombre, categoria: (exCategoria as any) || null, musculos, descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
+        await createEjercicio({ nombre: exNombre, categoria: null, musculos: exCategoria ? [exCategoria] : [], descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
       } else {
-        await updateEjercicio(ejercicioActual.id, { nombre: exNombre, categoria: (exCategoria as any) || null, musculos, descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
+        await updateEjercicio(ejercicioActual.id, { nombre: exNombre, categoria: null, musculos: exCategoria ? [exCategoria] : [], descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
       }
       setDialogoAbierto(false);
       setEjercicioActualId(null);
@@ -169,24 +189,24 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="categoria">Categoría</Label>
+                  <Label htmlFor="musculo">Músculo</Label>
                   <Select value={exCategoria} onValueChange={(v) => setExCategoria(v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fuerza">Fuerza</SelectItem>
-                      <SelectItem value="cardio">Cardio</SelectItem>
-                      <SelectItem value="flexibilidad">Flexibilidad</SelectItem>
-                      <SelectItem value="core">Core</SelectItem>
-                      <SelectItem value="equilibrio">Equilibrio</SelectItem>
+                      <SelectItem value="cuadriceps">Cuádriceps</SelectItem>
+                      <SelectItem value="femoral">Femoral</SelectItem>
+                      <SelectItem value="pecho">Pecho</SelectItem>
+                      <SelectItem value="espalda">Espalda</SelectItem>
+                      <SelectItem value="biceps">Bíceps</SelectItem>
+                      <SelectItem value="triceps">Tríceps</SelectItem>
+                      <SelectItem value="abdomen">Abdomen</SelectItem>
+                      <SelectItem value="hombros">Hombros</SelectItem>
+                      <SelectItem value="gluteo">Glúteo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="musculos">Músculos trabajados</Label>
-                <Input id="musculos" placeholder="pecho, brazos, etc." value={exMusculosStr} onChange={(e) => setExMusculosStr(e.target.value)} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="descripcion">Descripción</Label>
@@ -391,21 +411,18 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                             return (
                               <div key={`dia-${dia}-idx-${idx}`} className="grid md:grid-cols-6 gap-2 items-end">
                                 <div className="md:col-span-2">
-                                  <Select value={item.ejercicio_id} onValueChange={(v) => {
-                                    setRutinaDetalle(prev => {
-                                      const next = [...prev];
-                                      next[idx].ejercicio_id = v;
-                                      return next;
-                                    });
-                                  }}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Seleccionar ejercicio" />
-                                    </SelectTrigger>
-                                <SelectContent>
-                                  {ejercicios.map((e: EjercicioRow) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                                  <ExerciseCombobox
+                                    value={item.ejercicio_id}
+                                    options={ejercicios}
+                                    onChange={(v) => {
+                                      setRutinaDetalle(prev => {
+                                        const next = [...prev];
+                                        next[idx].ejercicio_id = v;
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </div>
                             {/* Campo Orden eliminado por simplicidad */}
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
@@ -430,16 +447,16 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                 next[idx].dia = v;
                                 return next;
                               });
-                                }}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Día" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {Array.from({ length: diasPreset === '3' ? 3 : 5 }, (_, i) => `${i+1}`).map(d => (
-                                      <SelectItem key={d} value={d}>Día {d}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                              }}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Día" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: diasPreset === '3' ? 3 : 5 }, (_, i) => `${i+1}`).map(d => (
+                                    <SelectItem key={d} value={d}>Día {d}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                                 <Button
                                   className="h-9 w-9 p-0"
                                   variant="destructive"
@@ -465,20 +482,17 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                         return (
                           <div key={idx} className="grid md:grid-cols-6 gap-2 items-end">
                             <div className="md:col-span-2">
-                              <Select value={item.ejercicio_id} onValueChange={(v) => {
-                                setRutinaDetalle(prev => {
-                                  const next = [...prev];
-                                  next[idx].ejercicio_id = v;
-                                  return next;
-                                });
-                              }}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar ejercicio" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {ejercicios.map((e: EjercicioRow) => (<SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>))}
-                                </SelectContent>
-                              </Select>
+                              <ExerciseCombobox
+                                value={item.ejercicio_id}
+                                options={ejercicios}
+                                onChange={(v) => {
+                                  setRutinaDetalle(prev => {
+                                    const next = [...prev];
+                                    next[idx].ejercicio_id = v;
+                                    return next;
+                                  });
+                                }}
+                              />
                             </div>
                             {/* Campo Orden eliminado por simplicidad */}
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
@@ -625,7 +639,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
           </Card>
 
           <Dialog open={verRutinaAbierto} onOpenChange={setVerRutinaAbierto}>
-            <DialogContent className="sm:max-w-[700px]">
+            <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle>
                   {rutinaVista?.rutina?.nombre || "Detalle de Rutina"}
@@ -637,7 +651,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
               {verRutinaLoading ? (
                 <div className="py-6 text-center text-muted-foreground">Cargando detalle...</div>
               ) : (
-                <div ref={rutinaExportRef} className="space-y-4 bg-white p-4 rounded-md">
+                <ScrollArea className="flex-1 pr-4">
+                  <div ref={rutinaExportRef} className="space-y-4 bg-white p-4 rounded-md">
                   {rutinaVista?.rutina?.notas && (
                     <div>
                       <Label>Notas</Label>
@@ -658,7 +673,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                   {item.ejercicios?.imagen_url && (
                                     <img
                                       src={item.ejercicios.imagen_url}
-                                      className="h-12 w-12 object-contain rounded bg-muted"
+                                      className={`${imageSizeClass} object-contain rounded bg-muted`}
+                                      crossOrigin="anonymous"
                                       onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
                                       loading="lazy"
                                       referrerPolicy="no-referrer"
@@ -702,7 +718,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                       {item.ejercicios?.imagen_url && (
                                         <img
                                           src={item.ejercicios.imagen_url}
-                                          className="h-12 w-12 object-contain rounded bg-muted"
+                                          className={`${imageSizeClass} object-contain rounded bg-muted`}
+                                          crossOrigin="anonymous"
                                           onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
                                           loading="lazy"
                                           referrerPolicy="no-referrer"
@@ -731,14 +748,18 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                       );
                     })()}
                   </div>
-                </div>
+                  </div>
+                </ScrollArea>
               )}
-              <DialogFooter className="flex items-center justify-between">
+              <DialogFooter className="flex items-center justify-between mt-4">
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     onClick={async () => {
                       try {
+                        setExporting(true);
+                        await waitImagesLoaded(rutinaExportRef.current);
+                        await new Promise(r => setTimeout(r, 150));
                         const node = rutinaExportRef.current;
                         if (!node) return;
                         const canvas = await html2canvas(node, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
@@ -752,6 +773,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                       } catch (err) {
                         console.error('Error exportando JPG', err);
                         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar la rutina a JPG.' });
+                      } finally {
+                        setExporting(false);
                       }
                     }}
                   >
@@ -760,6 +783,9 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                   <Button
                     onClick={async () => {
                       try {
+                        setExporting(true);
+                        await waitImagesLoaded(rutinaExportRef.current);
+                        await new Promise(r => setTimeout(r, 150));
                         const node = rutinaExportRef.current;
                         if (!node) return;
                         const canvas = await html2canvas(node, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
@@ -799,6 +825,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                       } catch (err) {
                         console.error('Error exportando PDF', err);
                         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar la rutina a PDF.' });
+                      } finally {
+                        setExporting(false);
                       }
                     }}
                   >
@@ -841,5 +869,51 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
         </div>
       )}
     </div>
+  );
+}
+
+function ExerciseCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string | null | undefined;
+  options: EjercicioRow[];
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(o => o.id === value);
+  const label = selected?.nombre || "Seleccionar ejercicio";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="justify-between w-full">
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" sideOffset={4}>
+        <Command>
+          <CommandInput placeholder="Buscar ejercicio..." />
+          <CommandEmpty>Sin resultados</CommandEmpty>
+          <CommandList>
+            <CommandGroup>
+              {options.map((e) => (
+                <CommandItem
+                  key={e.id}
+                  value={e.nombre}
+                  onSelect={() => {
+                    onChange(e.id);
+                    setOpen(false);
+                  }}
+                >
+                  {e.nombre}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -131,7 +131,18 @@ export const useEjercicios = () => {
 
   const deleteEjercicio = async (id: string) => {
     try {
-      const { error } = await supabase.from('ejercicios').delete().eq('id', id);
+      // Primero eliminar referencias en rutina_ejercicios (FK on delete restrict)
+      const { error: detErr } = await supabase
+        .from('rutina_ejercicios')
+        .delete()
+        .eq('ejercicio_id', id);
+      if (detErr) throw detErr;
+
+      // Luego eliminar el ejercicio
+      const { error } = await supabase
+        .from('ejercicios')
+        .delete()
+        .eq('id', id);
       if (error) throw error;
       setEjercicios(ejercicios.filter(e => e.id !== id));
     } catch (err) {
