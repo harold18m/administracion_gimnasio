@@ -167,6 +167,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
       toast({ variant: "destructive", title: "Sin código", description: "Genera o guarda el cliente para descargar el QR." });
       return;
     }
+    const nombreCliente = (form.getValues("nombre") || "").trim();
     const svg = qrContainerRef.current?.querySelector('svg');
     if (!svg) {
       toast({ variant: "destructive", title: "QR no disponible", description: "No se encontró el SVG del QR." });
@@ -187,10 +188,12 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
       const height = baseSize * scale;
       // Marco blanco (10% del tamaño o mínimo 32px)
       const padding = Math.max(32, Math.round(Math.min(width, height) * 0.1));
+      // Altura reservada para el encabezado con el nombre
+      const headerHeight = nombreCliente ? Math.max(48, Math.round(height * 0.2)) : 0;
 
       const canvas = document.createElement('canvas');
       canvas.width = width + padding * 2;
-      canvas.height = height + padding * 2;
+      canvas.height = headerHeight + height + padding * 2;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         URL.revokeObjectURL(url);
@@ -201,7 +204,28 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
       ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, padding, padding, width, height);
+      // Si hay nombre, dibujarlo centrado arriba
+      if (headerHeight > 0) {
+        let fontSize = Math.round(width * 0.1); // tamaño base proporcional
+        const maxTextWidth = canvas.width - padding * 2;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        // Reducir fontSize si el texto no cabe
+        while (fontSize > 14) {
+          ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+          const metrics = ctx.measureText(nombreCliente);
+          if (metrics.width <= maxTextWidth) break;
+          fontSize -= 2;
+        }
+        ctx.fillStyle = '#000000';
+        ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+        // Posicionar texto en el área de encabezado
+        const textY = padding; // desde arriba
+        ctx.fillText(nombreCliente, Math.floor(canvas.width / 2), textY);
+      }
+      // Dibujar el QR debajo del encabezado
+      const qrY = padding + headerHeight;
+      ctx.drawImage(img, padding, qrY, width, height);
 
       const pngData = canvas.toDataURL('image/png');
       const a = document.createElement('a');
