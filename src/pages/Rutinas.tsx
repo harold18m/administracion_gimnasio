@@ -94,6 +94,13 @@ export default function Rutinas() {
 const [exImagenUrl, setExImagenUrl] = useState<string>("");
   const ejerciciosFiltrados = filteredEjercicios;
   const [tab, setTab] = useState<'ejercicios' | 'rutinas'>('ejercicios');
+  const [musculoFiltro, setMusculoFiltro] = useState<'all' | string>('all');
+  const ejerciciosFiltradosUI = useMemo(() => {
+    return ejerciciosFiltrados.filter((e) => {
+      if (musculoFiltro === 'all') return true;
+      return (e.musculos || []).includes(musculoFiltro);
+    });
+  }, [ejerciciosFiltrados, musculoFiltro]);
   const [rutinaNombre, setRutinaNombre] = useState("");
   const [rutinaNotas, setRutinaNotas] = useState("");
   const [rutinaClienteId, setRutinaClienteId] = useState<string>("");
@@ -247,31 +254,35 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
         <Button variant="outline" className="gap-2" onClick={() => setTab('rutinas')}>
           Rutinas
         </Button>
-        <Select>
+        <Select value={musculoFiltro} onValueChange={setMusculoFiltro}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Categoría" />
+            <SelectValue placeholder="Músculo" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="fuerza">Fuerza</SelectItem>
-            <SelectItem value="cardio">Cardio</SelectItem>
-            <SelectItem value="flexibilidad">Flexibilidad</SelectItem>
-            <SelectItem value="core">Core</SelectItem>
-            <SelectItem value="equilibrio">Equilibrio</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="cuadriceps">cuadriceps</SelectItem>
+            <SelectItem value="femoral">femoral</SelectItem>
+            <SelectItem value="pecho">pecho</SelectItem>
+            <SelectItem value="espalda">espalda</SelectItem>
+            <SelectItem value="biceps">biceps</SelectItem>
+            <SelectItem value="triceps">triceps</SelectItem>
+            <SelectItem value="abdomen">abdomen</SelectItem>
+            <SelectItem value="hombros">hombros</SelectItem>
+            <SelectItem value="gluteo">gluteo</SelectItem>
           </SelectContent>
         </Select>
       </div>
       
       {tab === 'ejercicios' && (
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {ejerciciosFiltrados.length === 0 && (
+        {ejerciciosFiltradosUI.length === 0 && (
           <div className="col-span-full flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
             <Dumbbell className="h-10 w-10 mb-2" />
             <p>No hay ejercicios aún. Crea el primero para empezar.</p>
             <Button className="mt-3" onClick={abrirNuevoEjercicio}>Nuevo Ejercicio</Button>
           </div>
         )}
-        {ejerciciosFiltrados.map((ejercicio) => (
+        {ejerciciosFiltradosUI.map((ejercicio) => (
           <Card key={ejercicio.id}>
             <CardHeader className="relative">
               <div className="absolute right-4 top-4 space-x-1">
@@ -793,31 +804,22 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                         const pdf = new jsPDF('p', 'mm', 'a4');
                         const pageWidth = pdf.internal.pageSize.getWidth();
                         const pageHeight = pdf.internal.pageSize.getHeight();
-                        const imgWidth = pageWidth;
-                        const imgHeight = (canvas.height * pageWidth) / canvas.width;
-                        let y = 10;
-                        if (imgHeight > pageHeight - 20) {
-                          // Si la imagen es muy larga, dividir en páginas
-                          let remainingHeight = imgHeight;
-                          let position = 10;
-                          const sliceHeight = (canvas.height * (pageHeight - 20)) / ((canvas.width));
-                          const totalSlices = Math.ceil((canvas.height) / sliceHeight);
-                          for (let i = 0; i < totalSlices; i++) {
-                            const sliceCanvas = document.createElement('canvas');
-                            sliceCanvas.width = canvas.width;
-                            sliceCanvas.height = Math.min(sliceHeight, canvas.height - i * sliceHeight);
-                            const ctx = sliceCanvas.getContext('2d');
-                            if (!ctx) break;
-                            ctx.drawImage(canvas, 0, i * sliceHeight, sliceCanvas.width, sliceCanvas.height, 0, 0, sliceCanvas.width, sliceCanvas.height);
-                            const sliceImgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
-                            const sliceImgHeight = (sliceCanvas.height * pageWidth) / sliceCanvas.width;
-                            if (i > 0) pdf.addPage();
-                            pdf.addImage(sliceImgData, 'JPEG', 10, 10, pageWidth - 20, sliceImgHeight);
-                            remainingHeight -= sliceImgHeight;
-                            position = 10;
-                          }
-                        } else {
-                          pdf.addImage(imgData, 'JPEG', 10, y, pageWidth - 20, imgHeight);
+                        const margin = 10;
+                        const imgWidth = pageWidth - margin * 2;
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                        let heightLeft = imgHeight;
+                        let position = margin;
+
+                        // Primera página
+                        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+                        heightLeft -= (pageHeight - margin * 2);
+
+                        // Páginas siguientes (desplazando la imagen hacia arriba)
+                        while (heightLeft > 0) {
+                          pdf.addPage();
+                          position = margin - (imgHeight - heightLeft);
+                          pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+                          heightLeft -= (pageHeight - margin * 2);
                         }
                         const nombre = (rutinaVista?.rutina?.nombre || 'rutina').replace(/\s+/g, '_');
                         const fecha = new Date().toISOString().slice(0,10);
