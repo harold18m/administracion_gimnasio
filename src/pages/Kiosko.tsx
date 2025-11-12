@@ -22,6 +22,34 @@ export default function Kiosko() {
   const lastTimeRef = useRef<number>(0);
   const overlayTimerRef = useRef<number | null>(null);
   const scannerAreaRef = useRef<HTMLDivElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const playAccessSound = async () => {
+    try {
+      if (!audioCtxRef.current) {
+        const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+        audioCtxRef.current = AC ? new AC() : null;
+      }
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      if (ctx.state === "suspended") {
+        try { await ctx.resume(); } catch {}
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440, ctx.currentTime); // tono bajo
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 0.02); // volumen suave
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.26);
+    } catch {
+      // Silenciar cualquier error de audio para no interrumpir el flujo del kiosko
+    }
+  };
 
   // Determina si la membresía está vencida por fecha_fin
   const estaVencidaPorFecha = (fin?: string | null) => {
@@ -34,7 +62,8 @@ export default function Kiosko() {
   };
 
   const registrarAsistencia = async (
-    cliente: Database["public"]["Tables"]["clientes"]["Row"]
+    cliente: Database["public"]["Tables"]["clientes"]["Row"],
+    esDiario?: boolean
   ) => {
     const vencidaPorFecha = estaVencidaPorFecha(cliente.fecha_fin);
     const suspendida = cliente.estado === "suspendida";
@@ -78,15 +107,36 @@ export default function Kiosko() {
     }
 
     if (yaHoy && yaHoy.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Ya registrado",
-        description: `${cliente.nombre} ya tiene una asistencia hoy.`,
-      });
-      setUltimoCliente(cliente);
-      const hora = new Date().toTimeString().split(" ")[0];
-      setUltimaHora(hora);
-      return;
+      if (esDiario) {
+        // Membresía diaria: permitir acceso ilimitado sin duplicar registro (solo overlay)
+        const hora = new Date().toTimeString().split(" ")[0];
+        setUltimoCliente(cliente);
+        setUltimaHora(hora);
+
+        // Mostrar overlay de acceso concedido 5 segundos
+        setOverlayKind("granted");
+        setOverlayVisible(true);
+        if (overlayTimerRef.current) {
+          clearTimeout(overlayTimerRef.current);
+          overlayTimerRef.current = null;
+        }
+        overlayTimerRef.current = window.setTimeout(() => {
+          setOverlayVisible(false);
+          setOverlayKind(null);
+          setOverlayDeniedReason(null);
+          setUltimoCliente(null);
+          setUltimoCodigoQR("");
+        }, 5000);
+        // Sonido de acceso concedido
+        playAccessSound();
+        return;
+      } else {
+        // No duplicar registro ni mostrar toast; mantener feedback mínimo
+        setUltimoCliente(cliente);
+        const hora = new Date().toTimeString().split(" ")[0];
+        setUltimaHora(hora);
+        return;
+      }
     }
 
     const { data: inserted, error: errorInsert } = await supabase
@@ -103,7 +153,6 @@ export default function Kiosko() {
     const hora = new Date(inserted?.fecha_asistencia || Date.now()).toTimeString().split(" ")[0];
     setUltimoCliente(cliente);
     setUltimaHora(hora);
-    toast({ title: "¡Bienvenido!", description: `${cliente.nombre} registrado a las ${hora}.` });
 
     // Mostrar overlay de acceso concedido 5 segundos y luego volver a la cámara
     setOverlayKind("granted");
@@ -119,6 +168,8 @@ export default function Kiosko() {
       setUltimoCliente(null);
       setUltimoCodigoQR("");
     }, 5000);
+    // Sonido de acceso concedido
+    playAccessSound();
   };
 
   const registrarPorQR = async (valor: string) => {
@@ -137,7 +188,7 @@ export default function Kiosko() {
 
     const { data: cliente, error } = await supabase
       .from("clientes")
-      .select("id, nombre, dni, estado, avatar_url, nombre_membresia, tipo_membresia, fecha_fin")
+      .select("id, nombre, dni, estado, avatar_url, nombre_membresia, tipo_membresia, fecha_fin, membresia_id")
       .eq("codigo_qr", valor)
       .maybeSingle();
 
@@ -164,8 +215,30 @@ export default function Kiosko() {
       return;
     }
 
+    // Consultar nombre y modalidad de la membresía para mostrar correctamente
+    let esDiario = false;
+    let nombreMembresia: string | null | undefined = cliente.nombre_membresia;
+    let modalidadMembresia: string | null | undefined = cliente.tipo_membresia;
+    if (cliente.membresia_id) {
+      const { data: membresia } = await supabase
+        .from("membresias")
+        .select("nombre, modalidad")
+        .eq("id", cliente.membresia_id)
+        .maybeSingle();
+      esDiario = membresia?.modalidad === "diario";
+      nombreMembresia = nombreMembresia ?? membresia?.nombre ?? null;
+      modalidadMembresia = modalidadMembresia ?? membresia?.modalidad ?? null;
+    }
+
+    // Enriquecer cliente para que el overlay muestre la membresía actual
+    const clienteConMembresia = {
+      ...cliente,
+      nombre_membresia: nombreMembresia ?? cliente.nombre_membresia ?? null,
+      tipo_membresia: modalidadMembresia ?? cliente.tipo_membresia ?? null,
+    } as Database["public"]["Tables"]["clientes"]["Row"];
+
     setUltimoCodigoQR(valor);
-    await registrarAsistencia(cliente);
+    await registrarAsistencia(clienteConMembresia, esDiario);
   };
 
   // Utilidad para formatear fecha YYYY-MM-DD
@@ -274,7 +347,7 @@ export default function Kiosko() {
                           <div className="h-14 w-14 rounded-full bg-orange-600/20 border border-orange-500/40 flex items-center justify-center">
                             <User2 className="h-7 w-7 text-orange-400" />
                           </div>
-                          <div className="text-xl font-bold">{ultimoCliente.nombre}</div>
+                          <div className="text-xl font-bold text-white">{ultimoCliente.nombre}</div>
                           <div className="text-xs text-green-300">Miembro Verificado</div>
                         </div>
 
@@ -342,7 +415,7 @@ export default function Kiosko() {
                             <div className="h-14 w-14 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center">
                               <AlertTriangle className="h-7 w-7 text-red-300" />
                             </div>
-                            <div className="text-xl font-bold">{ultimoCliente?.nombre}</div>
+                            <div className="text-xl font-bold text-white">{ultimoCliente?.nombre}</div>
                             <div className="text-xs text-red-300">
                               {overlayDeniedReason === "expired" ? "Membresía Expirada" : "Membresía Suspendida"}
                             </div>
