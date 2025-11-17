@@ -117,6 +117,263 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
   const [exporting, setExporting] = useState(false);
   const imageSizeClass = exporting ? 'h-20 w-20' : 'h-12 w-12';
 
+  // Función para generar PDF con saltos de página entre días e imágenes
+  const generarPDFConSaltos = async () => {
+    try {
+      setExporting(true);
+      
+      // Crear PDF con saltos de página entre días
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      
+      let yPosition = margin;
+      
+      // Título de la rutina
+      pdf.setFontSize(20);
+      pdf.setFont(undefined, 'bold');
+      pdf.text(rutinaVista?.rutina?.nombre || 'Rutina de Ejercicios', margin, yPosition);
+      yPosition += 10;
+      
+      // Días de la rutina
+      if (rutinaVista?.rutina?.dias && rutinaVista.rutina.dias.length > 0) {
+        pdf.setFontSize(12);
+        pdf.setFont(undefined, 'normal');
+        pdf.text(`Días: ${rutinaVista.rutina.dias.join(', ')}`, margin, yPosition);
+        yPosition += 10;
+      }
+      
+      // Notas si existen
+      if (rutinaVista?.rutina?.notas) {
+        pdf.setFontSize(11);
+        pdf.text('Notas:', margin, yPosition);
+        yPosition += 5;
+        
+        // Dividir notas en líneas si son largas
+        const notasLines = pdf.splitTextToSize(rutinaVista.rutina.notas, contentWidth);
+        pdf.text(notasLines, margin, yPosition);
+        yPosition += notasLines.length * 5 + 5;
+      }
+      
+      // Procesar ejercicios por días
+      const detalle = (rutinaVista?.detalle || []) as any[];
+      const tieneDia = detalle.some(d => d.dia);
+      
+      // Función auxiliar para cargar imágenes
+      const cargarImagen = (url: string): Promise<string> => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 80;
+            canvas.height = 60;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              // Establecer fondo blanco
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              // Dibujar la imagen encima del fondo blanco
+              ctx.drawImage(img, 0, 0, 80, 60);
+              resolve(canvas.toDataURL('image/jpeg', 0.8));
+            } else {
+              resolve('');
+            }
+          };
+          img.onerror = () => resolve('');
+          img.src = url;
+        });
+      };
+      
+      if (tieneDia) {
+        // Agrupar por días
+        const grupos: Record<string, any[]> = {};
+        for (const it of detalle) {
+          const key = String(it.dia || '1');
+          if (!grupos[key]) grupos[key] = [];
+          grupos[key].push(it);
+        }
+        
+        const diasOrdenados = Object.keys(grupos).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+        
+        for (let diaIndex = 0; diaIndex < diasOrdenados.length; diaIndex++) {
+          const diaKey = diasOrdenados[diaIndex];
+          
+          // Salto de página para cada día (excepto el primero)
+          if (diaIndex > 0) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          // Título del día
+          pdf.setFontSize(16);
+          pdf.setFont(undefined, 'bold');
+          pdf.text(`Día ${diaKey}`, margin, yPosition);
+          yPosition += 15;
+          
+          // Ejercicios del día
+          const ejerciciosDia = grupos[diaKey];
+          
+          for (let ejIndex = 0; ejIndex < ejerciciosDia.length; ejIndex++) {
+            const item = ejerciciosDia[ejIndex];
+            const ejercicio = item.ejercicios;
+            if (!ejercicio) continue;
+            
+            // Calcular espacio necesario para este ejercicio
+            let espacioNecesario = 30; // Espacio base para imagen + detalles básicos
+            if (ejercicio.descripcion) {
+              const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
+              espacioNecesario += descLines.length * 4 + 5;
+            }
+            
+            // Verificar si necesitamos nueva página
+            if (yPosition + espacioNecesario > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+            
+            // Cargar y agregar imagen si existe
+            if (ejercicio.imagen_url) {
+              try {
+                const imgData = await cargarImagen(ejercicio.imagen_url);
+                if (imgData) {
+                  pdf.addImage(imgData, 'JPEG', margin, yPosition, 25, 20);
+                }
+              } catch (error) {
+                console.warn('Error al cargar imagen:', error);
+              }
+            }
+            
+            // Nombre del ejercicio (a la derecha de la imagen)
+            pdf.setFontSize(14);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(`${ejIndex + 1}. ${ejercicio.nombre}`, margin + 30, yPosition + 7);
+            
+            // Detalles del ejercicio
+            pdf.setFontSize(11);
+            pdf.setFont(undefined, 'normal');
+            
+            const detalles = [];
+            if (item.series) detalles.push(`Series: ${item.series}`);
+            if (item.repeticiones) detalles.push(`Reps: ${item.repeticiones}`);
+            if (item.tempo) detalles.push(`Tempo: ${item.tempo}`);
+            if (item.descanso) detalles.push(`Descanso: ${item.descanso}`);
+            
+            if (detalles.length > 0) {
+              pdf.text(detalles.join(' | '), margin + 30, yPosition + 15);
+              yPosition += 25;
+            } else {
+              yPosition += 20;
+            }
+            
+            // Descripción si existe
+            if (ejercicio.descripcion) {
+              const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
+              pdf.text(descLines, margin + 30, yPosition);
+              yPosition += descLines.length * 4 + 5;
+            } else {
+              yPosition += 5;
+            }
+            
+            // Línea separadora (solo si no es el último ejercicio)
+            if (ejIndex < ejerciciosDia.length - 1) {
+              pdf.setDrawColor(200, 200, 200);
+              pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+              yPosition += 8;
+            }
+          }
+          
+          // Optimizar espacio al final del día - si hay mucho espacio y es el último día, no agregar página extra
+          if (diaIndex < diasOrdenados.length - 1 && yPosition > pageHeight - 150) {
+            // Dejar espacio natural para el siguiente día
+          }
+        }
+      } else {
+        // Sin días, mostrar todos los ejercicios
+        for (let index = 0; index < detalle.length; index++) {
+          const item = detalle[index];
+          const ejercicio = item.ejercicios;
+          if (!ejercicio) continue;
+          
+          // Calcular espacio necesario para este ejercicio
+          let espacioNecesario = 30; // Espacio base para imagen + detalles básicos
+          if (ejercicio.descripcion) {
+            const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
+            espacioNecesario += descLines.length * 4 + 5;
+          }
+          
+          // Verificar si necesitamos nueva página
+          if (yPosition + espacioNecesario > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          // Cargar y agregar imagen si existe
+          if (ejercicio.imagen_url) {
+            try {
+              const imgData = await cargarImagen(ejercicio.imagen_url);
+              if (imgData) {
+                pdf.addImage(imgData, 'JPEG', margin, yPosition, 25, 20);
+              }
+            } catch (error) {
+              console.warn('Error al cargar imagen:', error);
+            }
+          }
+          
+          // Nombre del ejercicio
+          pdf.setFontSize(14);
+          pdf.setFont(undefined, 'bold');
+          pdf.text(`${index + 1}. ${ejercicio.nombre}`, margin + 30, yPosition + 7);
+          
+          // Detalles del ejercicio
+          pdf.setFontSize(11);
+          pdf.setFont(undefined, 'normal');
+          
+          const detalles = [];
+          if (item.series) detalles.push(`Series: ${item.series}`);
+          if (item.repeticiones) detalles.push(`Reps: ${item.repeticiones}`);
+          if (item.tempo) detalles.push(`Tempo: ${item.tempo}`);
+          if (item.descanso) detalles.push(`Descanso: ${item.descanso}`);
+          
+          if (detalles.length > 0) {
+            pdf.text(detalles.join(' | '), margin + 30, yPosition + 15);
+            yPosition += 25;
+          } else {
+            yPosition += 20;
+          }
+          
+          // Descripción si existe
+          if (ejercicio.descripcion) {
+            const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
+            pdf.text(descLines, margin + 30, yPosition);
+            yPosition += descLines.length * 4 + 5;
+          } else {
+            yPosition += 5;
+          }
+          
+          // Línea separadora (solo si no es el último ejercicio)
+          if (index < detalle.length - 1) {
+            pdf.setDrawColor(200, 200, 200);
+            pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 8;
+          }
+        }
+      }
+      
+      const nombre = (rutinaVista?.rutina?.nombre || 'rutina').replace(/\s+/g, '_');
+      const fecha = new Date().toISOString().slice(0, 10);
+      pdf.save(`${nombre}_${fecha}.pdf`);
+      
+    } catch (err) {
+      console.error('Error exportando PDF', err);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar la rutina a PDF.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const waitImagesLoaded = async (node?: HTMLDivElement | null) => {
     if (!node) return;
     const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
@@ -792,45 +1049,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                     Descargar JPG
                   </Button>
                   <Button
-                    onClick={async () => {
-                      try {
-                        setExporting(true);
-                        await waitImagesLoaded(rutinaExportRef.current);
-                        await new Promise(r => setTimeout(r, 150));
-                        const node = rutinaExportRef.current;
-                        if (!node) return;
-                        const canvas = await html2canvas(node, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
-                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                        const pdf = new jsPDF('p', 'mm', 'a4');
-                        const pageWidth = pdf.internal.pageSize.getWidth();
-                        const pageHeight = pdf.internal.pageSize.getHeight();
-                        const margin = 10;
-                        const imgWidth = pageWidth - margin * 2;
-                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                        let heightLeft = imgHeight;
-                        let position = margin;
-
-                        // Primera página
-                        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
-                        heightLeft -= (pageHeight - margin * 2);
-
-                        // Páginas siguientes (desplazando la imagen hacia arriba)
-                        while (heightLeft > 0) {
-                          pdf.addPage();
-                          position = margin - (imgHeight - heightLeft);
-                          pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
-                          heightLeft -= (pageHeight - margin * 2);
-                        }
-                        const nombre = (rutinaVista?.rutina?.nombre || 'rutina').replace(/\s+/g, '_');
-                        const fecha = new Date().toISOString().slice(0,10);
-                        pdf.save(`${nombre}_${fecha}.pdf`);
-                      } catch (err) {
-                        console.error('Error exportando PDF', err);
-                        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar la rutina a PDF.' });
-                      } finally {
-                        setExporting(false);
-                      }
-                    }}
+                    onClick={generarPDFConSaltos}
                   >
                     Descargar PDF
                   </Button>

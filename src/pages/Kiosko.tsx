@@ -11,6 +11,8 @@ export default function Kiosko() {
   const { toast } = useToast();
   const [scanActive] = useState(true);
   const [horaActual, setHoraActual] = useState<string>(new Date().toLocaleTimeString());
+  const [puertaEstado, setPuertaEstado] = useState<"desconectada" | "conectada" | "abriendo" | "error">("desconectada");
+  const serialDisponible = typeof (navigator as any).serial !== "undefined";
   
   const [ultimoCliente, setUltimoCliente] = useState<Database["public"]["Tables"]["clientes"]["Row"] | null>(null);
   const [ultimaHora, setUltimaHora] = useState<string>("");
@@ -23,6 +25,9 @@ export default function Kiosko() {
   const overlayTimerRef = useRef<number | null>(null);
   const scannerAreaRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const serialPortRef = useRef<any>(null);
+  const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(null);
+  const encoderRef = useRef(new TextEncoder());
 
   const playAccessSound = async () => {
     try {
@@ -129,6 +134,7 @@ export default function Kiosko() {
         }, 5000);
         // Sonido de acceso concedido
         playAccessSound();
+        abrirCerradura();
         return;
       } else {
         // No duplicar registro ni mostrar toast; mantener feedback mínimo
@@ -170,7 +176,56 @@ export default function Kiosko() {
     }, 5000);
     // Sonido de acceso concedido
     playAccessSound();
+    abrirCerradura();
   };
+
+  const conectarCerradura = async () => {
+    if (!serialDisponible) {
+      toast({ variant: "destructive", title: "Serial no disponible", description: "Usa Chrome/Edge" });
+      return;
+    }
+    try {
+      const port = await (navigator as any).serial.requestPort({ filters: [] });
+      await port.open({ baudRate: 9600 });
+      serialPortRef.current = port;
+      const writer = port.writable?.getWriter();
+      writerRef.current = writer || null;
+      setPuertaEstado("conectada");
+      toast({ title: "Puerta conectada", description: "Listo para abrir" });
+    } catch (e: any) {
+      setPuertaEstado("error");
+      toast({ variant: "destructive", title: "Error conectando", description: String(e?.message || e) });
+    }
+  };
+
+  const abrirCerradura = async (ms: number = 2000) => {
+    try {
+      if (!writerRef.current) return;
+      setPuertaEstado("abriendo");
+      await writerRef.current.write(encoderRef.current.encode("O"));
+      window.setTimeout(async () => {
+        try {
+          if (writerRef.current) {
+            await writerRef.current.write(encoderRef.current.encode("C"));
+          }
+          setPuertaEstado("conectada");
+        } catch {
+          setPuertaEstado("error");
+        }
+      }, ms);
+    } catch {
+      setPuertaEstado("error");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      try {
+        writerRef.current?.releaseLock();
+        serialPortRef.current?.close?.();
+      } catch {}
+    };
+  }, []);
 
   const registrarPorQR = async (valor: string) => {
     if (!valor) {
@@ -282,6 +337,17 @@ export default function Kiosko() {
 
       <Card className="bg-neutral-900 border-neutral-800 w-full max-w-2xl">
         <CardContent className="pt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-neutral-300">Puerta: {serialDisponible ? puertaEstado : "no soportado"}</div>
+            {serialDisponible && (
+              <button
+                onClick={conectarCerradura}
+                className="px-3 py-1 text-sm rounded-md border border-neutral-700 bg-neutral-800 hover:bg-neutral-700"
+              >
+                Conectar puerta
+              </button>
+            )}
+          </div>
           {scanActive && (
             <div ref={scannerAreaRef} className="relative rounded-lg overflow-hidden border border-neutral-800">
               <Scanner
