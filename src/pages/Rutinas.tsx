@@ -85,6 +85,7 @@ export default function Rutinas() {
   const { ejercicios, filteredEjercicios, busqueda, setBusqueda, createEjercicio, updateEjercicio, deleteEjercicio } = useEjercicios();
   const { clientes } = useClientes();
   const { rutinas, fetchRutinas, createRutina, getRutinaDetalle, updateRutina, deleteRutina } = useRutinas();
+  const { updateRutinaCompleta } = useRutinas();
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [ejercicioActualId, setEjercicioActualId] = useState<string | null>(null);
   const ejercicioActual = useMemo(() => ejercicios.find(e => e.id === ejercicioActualId) || null, [ejercicios, ejercicioActualId]);
@@ -106,7 +107,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
   const [rutinaClienteId, setRutinaClienteId] = useState<string>("");
   const [rutinaDias, setRutinaDias] = useState<string[]>([]);
   const [diasPreset, setDiasPreset] = useState<'3' | '5' | 'libre' | ''>('');
-  const [rutinaDetalle, setRutinaDetalle] = useState<Array<{ ejercicio_id: string; orden: number; series?: number; repeticiones?: string; tempo?: string; descanso?: string; notas?: string }>>([]);
+  const [rutinaDetalle, setRutinaDetalle] = useState<Array<{ ejercicio_id: string; orden: number; series?: number; repeticiones?: string; tempo?: string; descanso?: string; notas?: string; dia?: string | null }>>([]);
+  const [editingRutinaId, setEditingRutinaId] = useState<string | null>(null);
   const [verRutinaAbierto, setVerRutinaAbierto] = useState(false);
   const [verRutinaLoading, setVerRutinaLoading] = useState(false);
   const [rutinaVista, setRutinaVista] = useState<any>(null);
@@ -813,9 +815,18 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
               <Button onClick={async () => {
                 if (!rutinaNombre.trim()) { toast({ variant:'destructive', title:'Datos incompletos', description:'El nombre de la rutina es requerido.' }); return; }
                 try {
-                  await createRutina({ nombre: rutinaNombre, cliente_id: rutinaClienteId || null, notas: rutinaNotas, dias: rutinaDias }, rutinaDetalle.filter(d => d.ejercicio_id));
-                  toast({ title:'Rutina creada', description:'La rutina se guardó correctamente.' });
-                  setRutinaNombre(''); setRutinaNotas(''); setRutinaClienteId(''); setRutinaDias([]); setRutinaDetalle([]);
+                  if (editingRutinaId) {
+                    await updateRutinaCompleta(
+                      editingRutinaId,
+                      { nombre: rutinaNombre, cliente_id: rutinaClienteId || null, notas: rutinaNotas, dias: rutinaDias },
+                      rutinaDetalle.filter(d => d.ejercicio_id)
+                    );
+                    toast({ title:'Rutina actualizada', description:'La rutina se actualizó correctamente.' });
+                  } else {
+                    await createRutina({ nombre: rutinaNombre, cliente_id: rutinaClienteId || null, notas: rutinaNotas, dias: rutinaDias }, rutinaDetalle.filter(d => d.ejercicio_id));
+                    toast({ title:'Rutina creada', description:'La rutina se guardó correctamente.' });
+                  }
+                  setRutinaNombre(''); setRutinaNotas(''); setRutinaClienteId(''); setRutinaDias([]); setRutinaDetalle([]); setEditingRutinaId(null);
                   fetchRutinas(rutinaClienteId || undefined);
                 } catch {}
               }}>Guardar Rutina</Button>
@@ -873,6 +884,43 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                         </Button>
                       </div>
                       <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              const res = await getRutinaDetalle(r.id);
+                              setEditingRutinaId(r.id);
+                              setTab('rutinas');
+                              setRutinaNombre(res.rutina.nombre || '');
+                              setRutinaNotas(res.rutina.notas || '');
+                              setRutinaClienteId(res.rutina.cliente_id || '');
+                              setRutinaDias(res.rutina.dias || []);
+                              if (Array.isArray(res.rutina.dias)) {
+                                const d = res.rutina.dias;
+                                if (d.join(',') === ['Lunes','Miércoles','Viernes'].join(',')) setDiasPreset('3');
+                                else if (d.join(',') === ['Lunes','Martes','Miércoles','Jueves','Viernes'].join(',')) setDiasPreset('5');
+                                else setDiasPreset('libre');
+                              } else setDiasPreset('libre');
+                              setRutinaDetalle(
+                                (res.detalle || []).map((it: any, idx: number) => ({
+                                  ejercicio_id: it.ejercicio_id,
+                                  orden: it.orden ?? (idx + 1),
+                                  series: it.series ?? undefined,
+                                  repeticiones: it.repeticiones ?? undefined,
+                                  tempo: it.tempo ?? undefined,
+                                  descanso: it.descanso ?? undefined,
+                                  notas: it.notas ?? undefined,
+                                  dia: it.dia ?? undefined,
+                                })) as any
+                              );
+                              toast({ title: 'Edición de rutina', description: 'Cargada para edición.' });
+                            } catch {
+                              toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar la rutina para editar.' });
+                            }
+                          }}
+                        >
+                          Editar
+                        </Button>
                         <Button
                           variant="outline"
                           onClick={async () => {

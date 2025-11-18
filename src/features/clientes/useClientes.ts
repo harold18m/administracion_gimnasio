@@ -96,7 +96,7 @@ export const useClientes = () => {
     }
   };
 
-  const saveCliente = async (values: any, options: { closeDialog?: boolean } = { closeDialog: true }) => {
+  const saveCliente = async (values: any, options: { closeDialog?: boolean } = { closeDialog: false }) => {
     const computeCodigoQR = (telefono: string | null | undefined, id: string): string => {
       const telPart = (telefono || '').replace(/\D/g, '').slice(-4);
       const idPart = (id || '').split('-')[0].toUpperCase();
@@ -140,6 +140,8 @@ export const useClientes = () => {
         if (options.closeDialog) {
           setIsDialogOpen(false);
           setClienteActual(null);
+        } else {
+          setClienteActual(data);
         }
 
         return data;
@@ -188,6 +190,8 @@ export const useClientes = () => {
         if (options.closeDialog) {
           setIsDialogOpen(false);
           setClienteActual(null);
+        } else {
+          setClienteActual(updated);
         }
 
         return updated;
@@ -204,7 +208,7 @@ export const useClientes = () => {
   };
 
   const onSubmit = async (values: any) => {
-    await saveCliente(values, { closeDialog: true });
+    await saveCliente(values, { closeDialog: false });
   };
 
   const handleAddNew = () => {

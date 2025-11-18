@@ -75,6 +75,40 @@ export const useRutinas = () => {
     }
   };
 
+  const updateRutinaCompleta = async (
+    id: string,
+    base: RutinaUpdate,
+    ejercicios: Array<Omit<RutinaEjercicioInsert, 'id' | 'rutina_id'>>
+  ) => {
+    try {
+      const { data: updatedBase, error: upErr } = await supabase
+        .from('rutinas')
+        .update(base)
+        .eq('id', id)
+        .select()
+        .single();
+      if (upErr) throw upErr;
+      const { error: delErr } = await supabase
+        .from('rutina_ejercicios')
+        .delete()
+        .eq('rutina_id', id);
+      if (delErr) throw delErr;
+      if (ejercicios.length > 0) {
+        const withOrder = ejercicios.map((e, idx) => ({ ...e, rutina_id: id, orden: e.orden ?? (idx + 1) }));
+        const { error: insErr } = await supabase
+          .from('rutina_ejercicios')
+          .insert(withOrder);
+        if (insErr) throw insErr;
+      }
+      setRutinas(prev => prev.map(r => (r.id === id ? (updatedBase as Rutina) : r)));
+      return updatedBase as Rutina;
+    } catch (err) {
+      console.error('Error al actualizar rutina completa:', err);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la rutina' });
+      throw err;
+    }
+  };
+
   const getRutinaDetalle = async (rutinaId: string) => {
     const { data: rutina, error: rErr } = await supabase.from('rutinas').select('*').eq('id', rutinaId).single();
     if (rErr) throw rErr;
@@ -107,6 +141,7 @@ export const useRutinas = () => {
     createRutina,
     getRutinaDetalle,
     updateRutina,
+    updateRutinaCompleta,
     deleteRutina,
   };
 };

@@ -20,6 +20,7 @@ import { Cliente } from "./types";
 import { format, addMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
+import { User2, Star, CalendarRange, QrCode } from "lucide-react";
 
 export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
@@ -57,9 +58,9 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
   const qrContainerRef = useRef<HTMLDivElement | null>(null);
   const [step, setStep] = useState<number>(0);
   const steps = [
-    { key: 'datos', label: 'Datos personales' },
-    { key: 'membresia', label: 'Membresía y fechas' },
-    { key: 'qr', label: 'Código QR' },
+    { key: 'datos', icon: User2 },
+    { key: 'membresia', icon: CalendarRange },
+    { key: 'qr', icon: QrCode },
   ];
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -268,7 +269,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="items-center text-center">
           <DialogTitle className="text-lg md:text-xl">
             {clienteActual ? "Editar Cliente" : "Nuevo Cliente"}
           </DialogTitle>
@@ -278,25 +279,24 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
               : "Completa los datos para registrar un nuevo cliente"}
           </DialogDescription>
         </DialogHeader>
-        {/* Stepper */}
-        <div className="mb-3 md:mb-4">
-          <div className="flex items-center gap-2 md:gap-3">
-            {steps.map((st, idx) => (
-              <div key={st.key} className="flex items-center gap-2">
-                <div className={`px-2.5 py-1 rounded-md border text-xs md:text-sm ${
-                  idx === step
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : idx < step
-                    ? 'border-green-600 bg-green-900/20 text-green-400'
-                    : 'border-neutral-700 bg-neutral-800 text-neutral-300'
-                }`}>
-                  {st.label}
+        <div className="mb-4">
+          <div className="flex items-center justify-center gap-6">
+            {steps.map((st, idx) => {
+              const Icon = st.icon as any;
+              const active = idx === step;
+              const done = idx < step;
+              const base = active ? 'border-primary bg-primary/10 text-primary' : done ? 'border-green-600 bg-green-900/20 text-green-400' : 'border-neutral-700 bg-neutral-800 text-neutral-300';
+              return (
+                <div key={st.key} className="flex items-center gap-4">
+                  <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full border flex items-center justify-center ${base}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  {idx < steps.length - 1 && (
+                    <div className="hidden md:block w-10 h-[1px] bg-neutral-700" />
+                  )}
                 </div>
-                {idx < steps.length - 1 && (
-                  <div className="w-6 md:w-8 h-[1px] bg-neutral-700" />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <Form {...form}>
