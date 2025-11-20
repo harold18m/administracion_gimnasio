@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Edit, Trash2, Calendar, AlertTriangle } from "lucide-react";
+import { Search, Edit, Trash2, Calendar, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Cliente } from "./types";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
 import { formatISODate } from "@/lib/utils";
@@ -39,6 +40,14 @@ export function ClientesTable({
   onDelete,
 }: ClientesTableProps) {
   const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const totalPages = Math.max(1, Math.ceil(clientes.length / pageSize));
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const visibles = clientes.slice(start, end);
+
+  useEffect(() => { setPage(1); }, [busqueda, clientes.length]);
 
   return (
     <Card>
@@ -72,14 +81,14 @@ export function ClientesTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clientes.length === 0 ? (
+              {visibles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-4">
                     No se encontraron clientes
                   </TableCell>
                 </TableRow>
               ) : (
-                clientes.map((cliente) => {
+                visibles.map((cliente) => {
                   const status = getMembershipStatus(cliente.fecha_fin);
                   return (
                   <TableRow key={cliente.id}>
@@ -161,12 +170,12 @@ export function ClientesTable({
 
         {/* Vista de tarjetas para pantallas pequeñas */}
         <div className="md:hidden space-y-4">
-          {clientes.length === 0 ? (
+          {visibles.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No se encontraron clientes
             </div>
           ) : (
-            clientes.map((cliente) => {
+            visibles.map((cliente) => {
               const status = getMembershipStatus(cliente.fecha_fin);
               return (
                 <Card key={cliente.id} className="p-4">
@@ -247,6 +256,28 @@ export function ClientesTable({
           )}
         </div>
       </CardContent>
+      <div className="flex items-center justify-end gap-2 px-6 pb-4">
+        <span className="text-xs text-muted-foreground mr-auto">Mostrando {visibles.length} de {clientes.length}</span>
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={page <= 1}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          aria-label="Anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm">{page} / {totalPages}</span>
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={page >= totalPages}
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          aria-label="Siguiente"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
     </Card>
   );
 }
