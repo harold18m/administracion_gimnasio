@@ -48,10 +48,11 @@ const sidebarSections: { label: string; items: SidebarItem[] }[] = [
     label: 'Gestión',
     items: [
       { icon: Fingerprint, label: 'Asistencia', href: '/asistencia' },
-      { icon: UserCheck, label: 'Aforo', href: '/aforo' },
+      // { icon: UserCheck, label: 'Aforo', href: '/aforo' },
       { icon: Users, label: 'Clientes', href: '/clientes' },
+      { icon: Dumbbell, label: 'Ejercicios', href: '/rutinas' },
       { icon: CreditCard, label: 'Membresías', href: '/membresias' },
-      // { icon: Calendar, label: 'Calendario', href: '/calendario' },
+      { icon: Calendar, label: 'Calendario', href: '/calendario' },
     ],
   },
   {

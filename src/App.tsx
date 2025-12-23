@@ -95,8 +95,9 @@ const App = () => {
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/membresias" element={<Membresias />} />
                 <Route path="/perfil" element={<Perfil />} />
+                <Route path="/ejercicios" element={<Rutinas />} />
                 {/* Solo ruta de Rutinas */}
-                <Route path="/rutinas" element={<Rutinas />} />
+                < Route path="/rutinas" element={<Rutinas />} />
                 {/* Página de WhatsApp eliminada */}
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/chatbot" element={<ChatBot />} />
