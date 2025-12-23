@@ -18,6 +18,7 @@ import Registro from "./pages/Registro";
 import Kiosko from "./pages/Kiosko";
 import NotFound from "./pages/NotFound";
 import { useState, useEffect, createContext, useContext } from "react";
+import Perfil from "./pages/Perfil";
 
 // Crear contexto de autenticación
 interface AuthContextType {
@@ -28,8 +29,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
-  login: () => {},
-  logout: () => {},
+  login: () => { },
+  logout: () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -37,13 +38,13 @@ export const useAuth = () => useContext(AuthContext);
 // Componente de protección de rutas
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
-  
+
   // Para simplificar, asumimos autenticado durante desarrollo
   // En una implementación real, esto verificaría el estado de autenticación
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -82,7 +83,7 @@ const App = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/registro" element={<Registro />} />
               <Route path="/kiosko" element={<Kiosko />} />
-              
+
               {/* Rutas Protegidas */}
               <Route element={
                 <ProtectedRoute>
@@ -93,14 +94,15 @@ const App = () => {
                 <Route path="/asistencia" element={<Asistencia />} />
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/membresias" element={<Membresias />} />
+                <Route path="/perfil" element={<Perfil />} />
                 {/* Solo ruta de Rutinas */}
                 <Route path="/rutinas" element={<Rutinas />} />
-              {/* Página de WhatsApp eliminada */}
+                {/* Página de WhatsApp eliminada */}
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/chatbot" element={<ChatBot />} />
                 <Route path="/configuracion" element={<Configuracion />} />
               </Route>
-              
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

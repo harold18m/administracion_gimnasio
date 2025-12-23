@@ -11,6 +11,7 @@ import { z } from "zod";
 import { Dumbbell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/App";
+import Logo from "@/components/Logo";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Correo electrónico inválido" }),
@@ -36,16 +37,16 @@ export default function Login() {
     try {
       // Aquí se implementaría la autenticación real con Supabase o Firebase
       console.log("Login data:", values);
-      
+
       // Llamar a la función login del contexto
       login();
-      
+
       // Mostrar mensaje de éxito y redirigir
       toast({
         title: "Inicio de sesión exitoso",
         description: "Bienvenido a FitGym",
       });
-      
+
       navigate("/");
     } catch (error) {
       setIsLoading(false);
@@ -63,10 +64,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-black p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 flex flex-col items-center">
-          <div className="flex items-center justify-center mb-4">
-            <Dumbbell className="h-8 w-8 text-primary mr-2" />
-            <h2 className="text-3xl font-bold">FitGym</h2>
-          </div>
+          <Logo />
           <CardTitle className="text-2xl text-center">Iniciar sesión</CardTitle>
           <CardDescription className="text-center">
             Ingresa tus credenciales para acceder al sistema
@@ -107,14 +105,6 @@ export default function Login() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <div className="text-sm text-center text-muted-foreground">
-            ¿No tienes una cuenta?{" "}
-            <Link to="/registro" className="underline">
-              Regístrate
-            </Link>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   );
