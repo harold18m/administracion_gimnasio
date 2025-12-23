@@ -1,29 +1,34 @@
-
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Dumbbell, 
-  MessageSquare, 
-  Users, 
-  Calendar, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Dumbbell,
+  MessageSquare,
+  Users,
+  Calendar,
+  Settings,
   Bot,
   Menu,
-  LogOut,
   Fingerprint,
-  CreditCard
+  CreditCard,
+  User,
+  UserCheck
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
-  SidebarTrigger
+  SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarSeparator,
+  useSidebar,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/App';
+import { Logo } from '@/components/Logo';
+import { Link, useLocation } from 'react-router-dom';
 
 type SidebarItem = {
   icon: React.ElementType;
@@ -31,33 +36,41 @@ type SidebarItem = {
   href: string;
 };
 
-const sidebarItems: SidebarItem[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: Fingerprint, label: 'Asistencia', href: '/asistencia' },
-  { icon: Users, label: 'Clientes', href: '/clientes' },
-  { icon: CreditCard, label: 'Membresías', href: '/membresias' },
-  { icon: Dumbbell, label: 'Rutinas', href: '/rutinas' },
-  { icon: Calendar, label: 'Calendario', href: '/calendario' },
-  { icon: Bot, label: 'ChatBot', href: '/chatbot' },
-  { icon: Settings, label: 'Configuración', href: '/configuracion' },
+const sidebarSections: { label: string; items: SidebarItem[] }[] = [
+  {
+    label: 'Principal',
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+      { icon: User, label: 'Perfil', href: '/perfil' },
+    ],
+  },
+  {
+    label: 'Gestión',
+    items: [
+      { icon: Fingerprint, label: 'Asistencia', href: '/asistencia' },
+      { icon: UserCheck, label: 'Aforo', href: '/aforo' },
+      { icon: Users, label: 'Clientes', href: '/clientes' },
+      { icon: CreditCard, label: 'Membresías', href: '/membresias' },
+      // { icon: Calendar, label: 'Calendario', href: '/calendario' },
+    ],
+  },
+  {
+    label: 'Config',
+    items: [
+      { icon: Settings, label: 'Configuración', href: '/configuracion' },
+    ],
+  },
 ];
 
 export function GymSidebar() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { logout } = useAuth();
-  
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-  
+  const { pathname } = useLocation();
+  const { state } = useSidebar();
+
   return (
-    <Sidebar className="border-r" data-testid="sidebar">
-      <SidebarHeader className="flex h-16 items-center px-4 border-b">
+    <Sidebar className="border-r" variant="sidebar" collapsible="icon" data-testid="sidebar">
+      <SidebarHeader className="flex h-24 items-center px-4">
         <Link to="/" className="flex items-center gap-2">
-          <Dumbbell className="h-6 w-6 text-fitgym-white" />
-          <span className="font-bold text-lg text-fitgym-white">FitGym</span>
+          <Logo withText={state !== 'collapsed'} size={120} />
         </Link>
         <div className="ml-auto flex items-center gap-1 md:hidden">
           <SidebarTrigger>
@@ -65,34 +78,38 @@ export function GymSidebar() {
           </SidebarTrigger>
         </div>
       </SidebarHeader>
-      <SidebarContent className="p-2">
-        <div className="flex flex-col gap-1">
-          {sidebarItems.map((item) => (
-            <Link key={item.href} to={item.href}>
-              <Button
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start gap-2",
-                  location.pathname === item.href && "bg-accent text-accent-foreground"
-                )}
-              >
-                <item.icon className="h-5 w-5" />
-                <span>{item.label}</span>
-              </Button>
-            </Link>
-          ))}
-        </div>
+      <SidebarContent className="p-3 md:p-4">
+        {sidebarSections.map((section, idx) => (
+          <SidebarGroup key={section.label}>
+            <SidebarGroupLabel className="text-xs tracking-wide uppercase text-sidebar-foreground/60">
+              {section.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href}
+                      tooltip={item.label}
+                      size="lg"
+                      className="rounded-lg gap-3"
+                    >
+                      <Link to={item.href} className="flex items-center gap-3">
+                        <span className="inline-flex"><item.icon className="h-5 w-5" /></span>
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+            {idx < sidebarSections.length - 1 && (
+              <SidebarSeparator />
+            )}
+          </SidebarGroup>
+        ))}
       </SidebarContent>
-      <SidebarFooter className="p-2 border-t">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start gap-2 text-red-500 hover:text-red-700"
-          onClick={handleLogout}
-        >
-          <LogOut className="h-5 w-5" />
-          <span>Cerrar Sesión</span>
-        </Button>
-      </SidebarFooter>
     </Sidebar>
   );
 }
