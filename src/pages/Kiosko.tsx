@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
-import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle } from "lucide-react";
+import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle, BarChart3 } from "lucide-react";
 
 export default function Kiosko() {
   const { toast } = useToast();
@@ -19,7 +19,9 @@ export default function Kiosko() {
   const [ultimoCodigoQR, setUltimoCodigoQR] = useState<string>("");
   const [overlayVisible, setOverlayVisible] = useState<boolean>(false);
   const [overlayKind, setOverlayKind] = useState<"granted" | "denied" | null>(null);
-  const [overlayDeniedReason, setOverlayDeniedReason] = useState<"unknown" | "expired" | "suspended" | null>(null);
+  const [overlayDeniedReason, setOverlayDeniedReason] = useState<"unknown" | "expired" | "suspended" | "weekly_limit" | null>(null);
+  const [asistenciasSemana, setAsistenciasSemana] = useState<number>(0);
+  const LIMITE_SEMANAL_INTERDIARIO = 3;
   const lastCodeRef = useRef<string>("");
   const lastTimeRef = useRef<number>(0);
   const overlayTimerRef = useRef<number | null>(null);
@@ -68,7 +70,7 @@ export default function Kiosko() {
 
   const registrarAsistencia = async (
     cliente: Database["public"]["Tables"]["clientes"]["Row"],
-    esDiario?: boolean
+    esInterdiario?: boolean
   ) => {
     const vencidaPorFecha = estaVencidaPorFecha(cliente.fecha_fin);
     const suspendida = cliente.estado === "suspendida";
@@ -93,6 +95,79 @@ export default function Kiosko() {
       return;
     }
 
+    // Consultar asistencias semanales para TODOS los clientes
+    let asistenciasSemanales = 0;
+    const { data: countData, error: countError } = await supabase
+      .rpc("get_weekly_attendance_count", { client_id: cliente.id });
+    
+    if (!countError) {
+      asistenciasSemanales = countData ?? 0;
+      setAsistenciasSemana(asistenciasSemanales);
+    }
+    
+    // Validar límite semanal solo para membresías interdiarias
+    if (esInterdiario) {
+      
+      // Verificar si ya alcanzó el límite y NO tiene asistencia hoy
+      const now = new Date();
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data: yaHoy } = await supabase
+        .from("asistencias")
+        .select("id")
+        .eq("cliente_id", cliente.id)
+        .gte("fecha_asistencia", startOfDay.toISOString())
+        .lte("fecha_asistencia", endOfDay.toISOString());
+
+      const tieneAsistenciaHoy = yaHoy && yaHoy.length > 0;
+      
+      // Si ya tiene asistencia hoy, permitir re-acceso
+      if (tieneAsistenciaHoy) {
+        const hora = new Date().toTimeString().split(" ")[0];
+        setUltimoCliente(cliente);
+        setUltimaHora(hora);
+        setOverlayKind("granted");
+        setOverlayVisible(true);
+        if (overlayTimerRef.current) {
+          clearTimeout(overlayTimerRef.current);
+          overlayTimerRef.current = null;
+        }
+        overlayTimerRef.current = window.setTimeout(() => {
+          setOverlayVisible(false);
+          setOverlayKind(null);
+          setOverlayDeniedReason(null);
+          setUltimoCliente(null);
+          setUltimoCodigoQR("");
+        }, 5000);
+        playAccessSound();
+        abrirCerradura();
+        return;
+      }
+      
+      // Si alcanzó el límite y no tiene asistencia hoy, denegar
+      if (asistenciasSemanales >= LIMITE_SEMANAL_INTERDIARIO) {
+        setUltimoCliente(cliente);
+        setOverlayKind("denied");
+        setOverlayDeniedReason("weekly_limit");
+        setOverlayVisible(true);
+        if (overlayTimerRef.current) {
+          clearTimeout(overlayTimerRef.current);
+          overlayTimerRef.current = null;
+        }
+        overlayTimerRef.current = window.setTimeout(() => {
+          setOverlayVisible(false);
+          setOverlayKind(null);
+          setOverlayDeniedReason(null);
+          setUltimoCliente(null);
+          setUltimoCodigoQR("");
+        }, 5000);
+        return;
+      }
+    }
+
     const now = new Date();
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
@@ -112,37 +187,26 @@ export default function Kiosko() {
     }
 
     if (yaHoy && yaHoy.length > 0) {
-      if (esDiario) {
-        // Membresía diaria: permitir acceso ilimitado sin duplicar registro (solo overlay)
-        const hora = new Date().toTimeString().split(" ")[0];
-        setUltimoCliente(cliente);
-        setUltimaHora(hora);
-
-        // Mostrar overlay de acceso concedido 5 segundos
-        setOverlayKind("granted");
-        setOverlayVisible(true);
-        if (overlayTimerRef.current) {
-          clearTimeout(overlayTimerRef.current);
-          overlayTimerRef.current = null;
-        }
-        overlayTimerRef.current = window.setTimeout(() => {
-          setOverlayVisible(false);
-          setOverlayKind(null);
-          setOverlayDeniedReason(null);
-          setUltimoCliente(null);
-          setUltimoCodigoQR("");
-        }, 5000);
-        // Sonido de acceso concedido
-        playAccessSound();
-        abrirCerradura();
-        return;
-      } else {
-        // No duplicar registro ni mostrar toast; mantener feedback mínimo
-        setUltimoCliente(cliente);
-        const hora = new Date().toTimeString().split(" ")[0];
-        setUltimaHora(hora);
-        return;
+      // Ya tiene asistencia hoy, permitir re-acceso sin duplicar
+      const hora = new Date().toTimeString().split(" ")[0];
+      setUltimoCliente(cliente);
+      setUltimaHora(hora);
+      setOverlayKind("granted");
+      setOverlayVisible(true);
+      if (overlayTimerRef.current) {
+        clearTimeout(overlayTimerRef.current);
+        overlayTimerRef.current = null;
       }
+      overlayTimerRef.current = window.setTimeout(() => {
+        setOverlayVisible(false);
+        setOverlayKind(null);
+        setOverlayDeniedReason(null);
+        setUltimoCliente(null);
+        setUltimoCodigoQR("");
+      }, 5000);
+      playAccessSound();
+      abrirCerradura();
+      return;
     }
 
     const { data: inserted, error: errorInsert } = await supabase
@@ -155,6 +219,9 @@ export default function Kiosko() {
       toast({ variant: "destructive", title: "Error al registrar", description: errorInsert.message });
       return;
     }
+
+    // Actualizar contador de asistencias semanales después de registrar
+    setAsistenciasSemana(asistenciasSemanales + 1);
 
     const hora = new Date(inserted?.fecha_asistencia || Date.now()).toTimeString().split(" ")[0];
     setUltimoCliente(cliente);
@@ -271,7 +338,7 @@ export default function Kiosko() {
     }
 
     // Consultar nombre y modalidad de la membresía para mostrar correctamente
-    let esDiario = false;
+    let esInterdiario = false;
     let nombreMembresia: string | null | undefined = cliente.nombre_membresia;
     let modalidadMembresia: string | null | undefined = cliente.tipo_membresia;
     if (cliente.membresia_id) {
@@ -280,7 +347,7 @@ export default function Kiosko() {
         .select("nombre, modalidad")
         .eq("id", cliente.membresia_id)
         .maybeSingle();
-      esDiario = membresia?.modalidad === "diario";
+      esInterdiario = membresia?.modalidad === "interdiario";
       nombreMembresia = nombreMembresia ?? membresia?.nombre ?? null;
       modalidadMembresia = modalidadMembresia ?? membresia?.modalidad ?? null;
     }
@@ -293,7 +360,7 @@ export default function Kiosko() {
     } as Database["public"]["Tables"]["clientes"]["Row"];
 
     setUltimoCodigoQR(valor);
-    await registrarAsistencia(clienteConMembresia, esDiario);
+    await registrarAsistencia(clienteConMembresia, esInterdiario);
   };
 
   // Utilidad para formatear fecha YYYY-MM-DD
@@ -398,51 +465,68 @@ export default function Kiosko() {
               {/* Overlays encima de la cámara: acceso concedido o denegado */}
               {overlayVisible && (
                 overlayKind === "granted" && ultimoCliente && ultimoCliente.estado === "activa" && !estaVencidaPorFecha(ultimoCliente.fecha_fin) ? (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-950/70 backdrop-blur-sm">
-                    <div className="max-w-md w-[92%] rounded-2xl border border-green-700/40 bg-neutral-900/90 p-6 text-center">
-                      <div className="flex flex-col items-center mb-4">
-                        <div className="h-16 w-16 rounded-full bg-green-600/10 border border-green-500/40 flex items-center justify-center mb-2">
-                          <CheckCircle2 className="h-8 w-8 text-green-400" />
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="max-w-sm w-[90%] rounded-2xl bg-white shadow-2xl overflow-hidden">
+                      {/* Header verde */}
+                      <div className="bg-emerald-500 px-6 py-8 text-center relative">
+                        <button 
+                          onClick={() => setOverlayVisible(false)}
+                          className="absolute top-3 right-3 text-white/80 hover:text-white text-xl font-bold"
+                        >
+                          ×
+                        </button>
+                        <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-white/20 flex items-center justify-center">
+                          <CheckCircle2 className="h-10 w-10 text-white" />
                         </div>
-                        <div className="text-2xl font-bold text-green-400">¡Acceso Concedido!</div>
-                        <div className="text-sm text-neutral-300">Bienvenido al gimnasio</div>
+                        <div className="text-2xl font-bold text-white">¡Acceso Autorizado!</div>
                       </div>
-
-                      <div className="rounded-xl border border-green-700/30 bg-green-900/10 p-4">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="h-14 w-14 rounded-full bg-orange-600/20 border border-orange-500/40 flex items-center justify-center">
-                            <User2 className="h-7 w-7 text-orange-400" />
-                          </div>
-                          <div className="text-xl font-bold text-white">{ultimoCliente.nombre}</div>
-                          <div className="text-xs text-green-300">Miembro Verificado</div>
+                      
+                      {/* Contenido blanco */}
+                      <div className="px-6 py-5">
+                        <div className="text-center mb-4">
+                          <div className="text-sm text-gray-500">Miembro</div>
+                          <div className="text-xl font-bold text-gray-800">{ultimoCliente.nombre}</div>
                         </div>
-
-                        <div className="mt-4 space-y-3 text-left">
-                          <div className="flex items-center gap-3 rounded-lg border border-green-800/40 bg-neutral-800/40 p-3">
-                            <IdCard className="h-5 w-5 text-neutral-300" />
-                            <div className="flex-1">
-                              <div className="text-xs text-neutral-400">ID de Miembro</div>
-                              <div className="text-sm font-medium">{ultimoCodigoQR || ultimoCliente.dni || ultimoCliente.id}</div>
+                        
+                        <div className="space-y-3">
+                          {/* Tipo de Membresía */}
+                          <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <Star className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500">Tipo de Membresía</div>
+                              <div className="text-sm font-semibold text-gray-800">{ultimoCliente.nombre_membresia || ultimoCliente.tipo_membresia || "Sin membresía"}</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 rounded-lg border border-green-800/40 bg-neutral-800/40 p-3">
-                            <Star className="h-5 w-5 text-neutral-300" />
-                            <div className="flex-1">
-                              <div className="text-xs text-neutral-400">Tipo de Membresía</div>
-                              <div className="text-sm font-medium">{ultimoCliente.nombre_membresia || ultimoCliente.tipo_membresia || "-"}</div>
+                          
+                          {/* Visitas Esta Semana - Ahora se muestra para TODOS */}
+                          <div className="flex items-center gap-3 p-3 rounded-xl bg-purple-50 border border-purple-100">
+                            <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                              <BarChart3 className="h-5 w-5 text-purple-500" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500">Visitas Esta Semana</div>
+                              <div className="text-sm font-semibold text-gray-800">{asistenciasSemana} visitas</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 rounded-lg border border-green-800/40 bg-neutral-800/40 p-3">
-                            <CalendarRange className="h-5 w-5 text-neutral-300" />
-                            <div className="flex-1">
-                              <div className="text-xs text-neutral-400">Válida Hasta</div>
-                              <div className="text-sm font-medium">{formatoFecha(ultimoCliente.fecha_fin)}</div>
+                          
+                          {/* Válida Hasta */}
+                          <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-50 border border-orange-100">
+                            <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                              <CalendarRange className="h-5 w-5 text-orange-500" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500">Válida Hasta</div>
+                              <div className="text-sm font-semibold text-gray-800">{formatoFecha(ultimoCliente.fecha_fin)}</div>
                             </div>
                           </div>
                         </div>
-
-                        <div className="text-center text-xs text-green-300 mt-3">¡Que tengas un excelente entrenamiento!</div>
-                        <div className="text-center text-xs text-neutral-400">{ultimaHora ? `Registrado a las ${ultimaHora}` : "Registro confirmado"}</div>
+                        
+                        {/* Botón de confirmación */}
+                        <div className="mt-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                          <span className="text-emerald-600 font-medium">✓ Disfruta tu entrenamiento</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -458,6 +542,7 @@ export default function Kiosko() {
                           {overlayDeniedReason === "unknown" && "Usuario no registrado"}
                           {overlayDeniedReason === "expired" && "Membresía vencida"}
                           {overlayDeniedReason === "suspended" && "Membresía suspendida"}
+                          {overlayDeniedReason === "weekly_limit" && "Límite semanal alcanzado"}
                         </div>
                       </div>
 
@@ -472,6 +557,33 @@ export default function Kiosko() {
                           <ul className="text-sm text-neutral-300 list-disc pl-5 space-y-1">
                             <li>Dirígete a recepción para registrarte</li>
                             <li>Verifica que tu código QR sea correcto</li>
+                          </ul>
+                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 5 segundos...</div>
+                        </div>
+                      ) : overlayDeniedReason === "weekly_limit" ? (
+                        <div className="rounded-xl border border-orange-700/30 bg-orange-900/10 p-4 text-left">
+                          <div className="flex flex-col items-center gap-2 mb-3">
+                            <div className="h-14 w-14 rounded-full bg-orange-600/20 border border-orange-500/40 flex items-center justify-center">
+                              <BarChart3 className="h-7 w-7 text-orange-300" />
+                            </div>
+                            <div className="text-xl font-bold text-white">{ultimoCliente?.nombre}</div>
+                            <div className="text-xs text-orange-300">Membresía Interdiaria</div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3 rounded-lg border border-orange-800/40 bg-neutral-800/40 p-3">
+                              <BarChart3 className="h-5 w-5 text-orange-300" />
+                              <div className="flex-1">
+                                <div className="text-xs text-neutral-400">Visitas esta semana</div>
+                                <div className="text-sm font-medium text-orange-400">{asistenciasSemana}/{LIMITE_SEMANAL_INTERDIARIO} (límite alcanzado)</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 text-sm text-neutral-200 font-semibold">Para acceder al gimnasio:</div>
+                          <ul className="text-sm text-neutral-300 list-disc pl-5 space-y-1">
+                            <li>Espera hasta el próximo lunes para reiniciar tu contador</li>
+                            <li>O actualiza tu membresía a una modalidad diaria o libre en recepción</li>
                           </ul>
                           <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 5 segundos...</div>
                         </div>

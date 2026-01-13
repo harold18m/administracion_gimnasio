@@ -291,6 +291,12 @@ export interface Database {
         }
         Returns: boolean
       }
+      get_weekly_attendance_count: {
+        Args: {
+          client_id: string
+        }
+        Returns: number
+      }
     }
   }
 }

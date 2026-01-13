@@ -92,3 +92,27 @@ EXCEPTION
         RETURN FALSE;
 END;
 $$ language 'plpgsql';
+
+-- Función para contar días únicos de asistencia en la semana actual (Lunes-Domingo)
+-- Usada para validar límite de visitas en membresías interdiarias (3 visitas/semana)
+CREATE OR REPLACE FUNCTION get_weekly_attendance_count(client_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    count_result INTEGER;
+    week_start DATE;
+    week_end DATE;
+BEGIN
+    -- Obtener inicio de semana (Lunes) usando ISODOW donde Lunes=1
+    week_start := CURRENT_DATE - (EXTRACT(ISODOW FROM CURRENT_DATE) - 1)::INTEGER;
+    week_end := week_start + INTERVAL '6 days';
+    
+    -- Contar días únicos de asistencia (no registros individuales)
+    SELECT COUNT(DISTINCT fecha_asistencia::DATE)::INTEGER INTO count_result
+    FROM public.asistencias
+    WHERE cliente_id = client_id
+      AND fecha_asistencia::DATE >= week_start
+      AND fecha_asistencia::DATE <= week_end;
+    
+    RETURN COALESCE(count_result, 0);
+END;
+$$ LANGUAGE plpgsql;
