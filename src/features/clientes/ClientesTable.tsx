@@ -20,15 +20,17 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Edit, Trash2, Calendar, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Cliente } from "./types";
+import type { Database } from "@/lib/supabase";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
 import { formatISODate } from "@/lib/utils";
 
+type ClienteRow = Database['public']['Tables']['clientes']['Row'];
+
 interface ClientesTableProps {
-  clientes: Cliente[];
+  clientes: ClienteRow[];
   busqueda: string;
   onBusquedaChange: (value: string) => void;
-  onEdit: (cliente: Cliente) => void;
+  onEdit: (cliente: ClienteRow) => void;
   onDelete: (id: string) => void;
 }
 

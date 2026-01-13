@@ -466,8 +466,7 @@ export default function Asistencia() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Cliente</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Hora</TableHead>
+                      <TableHead>Fecha y Hora</TableHead>
                       <TableHead>Membresía</TableHead>
                       <TableHead>Vence</TableHead>
                       <TableHead>Método</TableHead>
@@ -496,10 +495,11 @@ export default function Asistencia() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          -                          {new Date(asistencia.fecha).toLocaleDateString()}
-                          +                          {formatISODate(asistencia.fecha)}
+                          <div>
+                            <p className="font-medium">{formatISODate(asistencia.fecha)}</p>
+                            <p className="text-xs text-muted-foreground">{asistencia.hora}</p>
+                          </div>
                         </TableCell>
-                        <TableCell>{asistencia.hora}</TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{cliente?.nombre_membresia ?? "Sin membresía"}</p>
@@ -507,8 +507,7 @@ export default function Asistencia() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          -                          {cliente?.fecha_fin ? new Date(cliente.fecha_fin).toLocaleDateString() : "—"}
-                          +                          {cliente?.fecha_fin ? formatISODate(cliente.fecha_fin) : "—"}
+                          {cliente?.fecha_fin ? formatISODate(cliente.fecha_fin) : "—"}
                         </TableCell>
                         <TableCell>
                           <Badge

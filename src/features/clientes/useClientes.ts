@@ -13,6 +13,7 @@ export const useClientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [clienteActual, setClienteActual] = useState<Cliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -59,7 +60,7 @@ export const useClientes = () => {
 
   const handleEdit = (cliente: Cliente) => {
     setClienteActual(cliente);
-    setIsDialogOpen(true);
+    setIsEditDialogOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -138,7 +139,7 @@ export const useClientes = () => {
         });
 
         if (options.closeDialog) {
-          setIsDialogOpen(false);
+          setIsEditDialogOpen(false);
           setClienteActual(null);
         } else {
           setClienteActual(data);
@@ -223,6 +224,8 @@ export const useClientes = () => {
     setBusqueda,
     isDialogOpen,
     setIsDialogOpen,
+    isEditDialogOpen,
+    setIsEditDialogOpen,
     clienteActual,
     loading,
     handleEdit,

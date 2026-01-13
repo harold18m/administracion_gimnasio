@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 import { ClientesTable } from "@/features/clientes/ClientesTable";
 import { ClienteForm } from "@/features/clientes/ClienteForm";
+import { ClienteEditForm } from "@/features/clientes/ClienteEditForm";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useClientes } from "@/features/clientes/useClientes";
 
@@ -13,6 +14,8 @@ export default function Clientes() {
     setBusqueda,
     isDialogOpen,
     setIsDialogOpen,
+    isEditDialogOpen,
+    setIsEditDialogOpen,
     clienteActual,
     handleEdit,
     handleDelete,
@@ -24,6 +27,10 @@ export default function Clientes() {
     membresiasDisponibles,
     saveCliente,
   } = useClientes();
+
+  const handleEditSubmit = async (values: any) => {
+    await saveCliente(values, { closeDialog: true });
+  };
 
   return (
     <div className="space-y-4">
@@ -43,14 +50,26 @@ export default function Clientes() {
         onDelete={handleDelete}
       />
 
+      {/* Modal para CREAR nuevo cliente */}
       <ClienteForm
         isOpen={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSubmit={onSubmit}
-        clienteActual={clienteActual}
+        clienteActual={null}
         membresiasDisponibles={membresiasDisponibles}
         saveCliente={saveCliente}
       />
+
+      {/* Modal para EDITAR cliente existente */}
+      {clienteActual && (
+        <ClienteEditForm
+          isOpen={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          onSubmit={handleEditSubmit}
+          cliente={clienteActual}
+          membresiasDisponibles={membresiasDisponibles}
+        />
+      )}
 
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
