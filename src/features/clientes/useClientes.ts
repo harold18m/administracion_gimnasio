@@ -103,6 +103,12 @@ export const useClientes = () => {
       const idPart = (id || '').split('-')[0].toUpperCase();
       return `FIT-${telPart ? telPart + '-' : ''}${idPart}`;
     };
+
+    // Obtener nombre y modalidad de la membresía seleccionada
+    const membresiaSeleccionada = values.membresia_id 
+      ? getMembresiasPorSeleccion().find(m => m.id === values.membresia_id)
+      : null;
+
     try {
       if (clienteActual) {
         // Editar cliente existente
@@ -113,6 +119,8 @@ export const useClientes = () => {
           dni: values.dni || null,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
+          nombre_membresia: membresiaSeleccionada?.nombre || null,
+          tipo_membresia: membresiaSeleccionada?.modalidad || null,
           fecha_inicio: values.fecha_inicio || null,
           fecha_fin: values.fecha_fin || null,
           codigo_qr: ((values.codigo_qr && values.codigo_qr.trim().length > 0)
@@ -155,6 +163,8 @@ export const useClientes = () => {
           dni: values.dni || null,
           fecha_nacimiento: values.fecha_nacimiento,
           membresia_id: values.membresia_id || null,
+          nombre_membresia: membresiaSeleccionada?.nombre || null,
+          tipo_membresia: membresiaSeleccionada?.modalidad || null,
           fecha_inicio: values.fecha_inicio || null,
           fecha_fin: values.fecha_fin || null,
           estado: 'activa',

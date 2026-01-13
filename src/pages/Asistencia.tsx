@@ -300,12 +300,34 @@ export default function Asistencia() {
       const fecha = new Date(asistencia.fecha_asistencia);
       const hora = fecha.toTimeString().split(" ")[0];
       const tipo = asistencia.notas === "qr" ? "qr" : "dni";
+      
+      // Calcular visitas semanales hasta esta asistencia (inclusive)
+      const fechaAsistencia = new Date(asistencia.fecha_asistencia);
+      const diaSemana = fechaAsistencia.getDay(); // 0=domingo
+      const diffToMonday = diaSemana === 0 ? -6 : 1 - diaSemana;
+      const weekStart = new Date(fechaAsistencia);
+      weekStart.setDate(fechaAsistencia.getDate() + diffToMonday);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      // Contar días únicos de asistencia en esa semana hasta la fecha de esta asistencia
+      const asistenciasCliente = asistencias.filter(a => 
+        a.cliente_id === asistencia.cliente_id &&
+        new Date(a.fecha_asistencia) >= weekStart &&
+        new Date(a.fecha_asistencia) <= fechaAsistencia
+      );
+      const diasUnicos = new Set(asistenciasCliente.map(a => a.fecha_asistencia.split('T')[0]));
+      const visitasSemana = diasUnicos.size;
+      
       return {
         asistencia: {
           id: asistencia.id,
           fecha: asistencia.fecha_asistencia,
           hora,
           tipo,
+          visitasSemana,
         },
         cliente,
       };
@@ -468,7 +490,7 @@ export default function Asistencia() {
                       <TableHead>Cliente</TableHead>
                       <TableHead>Fecha y Hora</TableHead>
                       <TableHead>Membresía</TableHead>
-                      <TableHead>Vence</TableHead>
+                      <TableHead>Visitas</TableHead>
                       <TableHead>Método</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -503,11 +525,15 @@ export default function Asistencia() {
                         <TableCell>
                           <div>
                             <p className="font-medium">{cliente?.nombre_membresia ?? "Sin membresía"}</p>
-                            <p className="text-xs text-muted-foreground">{cliente?.tipo_membresia ?? ""}</p>
+                            {cliente?.fecha_fin && (
+                              <p className="text-xs text-muted-foreground">Vence: {formatISODate(cliente.fecha_fin)}</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {cliente?.fecha_fin ? formatISODate(cliente.fecha_fin) : "—"}
+                          <Badge variant="secondary" className="font-medium">
+                            {asistencia.visitasSemana} esta semana
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge

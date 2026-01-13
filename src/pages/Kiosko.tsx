@@ -100,10 +100,32 @@ export default function Kiosko() {
     const { data: countData, error: countError } = await supabase
       .rpc("get_weekly_attendance_count", { client_id: cliente.id });
     
-    if (!countError) {
+    if (countError) {
+      console.warn("Error al obtener asistencias semanales:", countError.message);
+      // Intentar contar manualmente si la función RPC no existe
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Lunes
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      const { data: asistenciasData } = await supabase
+        .from("asistencias")
+        .select("fecha_asistencia")
+        .eq("cliente_id", cliente.id)
+        .gte("fecha_asistencia", weekStart.toISOString())
+        .lte("fecha_asistencia", weekEnd.toISOString());
+      
+      // Contar días únicos
+      if (asistenciasData) {
+        const diasUnicos = new Set(asistenciasData.map(a => a.fecha_asistencia.split('T')[0]));
+        asistenciasSemanales = diasUnicos.size;
+      }
+    } else {
       asistenciasSemanales = countData ?? 0;
-      setAsistenciasSemana(asistenciasSemanales);
     }
+    setAsistenciasSemana(asistenciasSemanales);
     
     // Validar límite semanal solo para membresías interdiarias
     if (esInterdiario) {

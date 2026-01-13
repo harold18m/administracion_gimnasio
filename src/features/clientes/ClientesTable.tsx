@@ -124,9 +124,12 @@ export function ClientesTable({
                       }
                     </TableCell>
                     <TableCell>
-                      <Badge variant="default">
-                        {cliente.membresia_id ? 'Con membresía' : 'Sin membresía'}
-                      </Badge>
+                      <div>
+                        <p className="font-medium">{cliente.nombre_membresia || 'Sin membresía'}</p>
+                        {cliente.tipo_membresia && (
+                          <p className="text-xs text-muted-foreground capitalize">{cliente.tipo_membresia}</p>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
@@ -233,7 +236,7 @@ export function ClientesTable({
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2">
                       <Badge variant="default" className="text-xs">
-                        {cliente.membresia_id ? 'Con membresía' : 'Sin membresía'}
+                        {cliente.nombre_membresia || 'Sin membresía'}
                       </Badge>
                       <Badge 
                         variant={status === 'active' ? 'default' : status === 'expiring' ? 'destructive' : 'secondary'}
