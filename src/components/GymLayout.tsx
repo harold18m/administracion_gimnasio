@@ -14,12 +14,23 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { User } from '@supabase/supabase-js';
 import type { CSSProperties } from 'react';
 import { useAuth } from "@/App";
+import { supabase } from "@/lib/supabase";
+
+interface EventoProximo {
+  id: string;
+  titulo: string;
+  tipo: string;
+  fecha: Date;
+  cliente?: string | null;
+  entrenador?: string | null;
+}
+
 interface GymLayoutProps {
   user?: User | null;
 }
@@ -30,45 +41,78 @@ export function GymLayout({ user }: GymLayoutProps) {
 
   // Estado para notificaciones
   const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
+  const [eventosProximos, setEventosProximos] = useState<EventoProximo[]>([]);
+  const [loadingEventos, setLoadingEventos] = useState(true);
 
-  // Datos estáticos de eventos próximos (maquetado)
-  const eventosProximos = [
-    {
-      id: '1',
-      titulo: 'Entrenamiento Personal - Juan Pérez',
-      tipo: 'entrenamiento',
-      fecha: new Date(Date.now() + 30 * 60 * 1000), // En 30 minutos
-      cliente: 'Juan Pérez',
-      entrenador: 'Carlos Mendoza'
-    },
-    {
-      id: '2',
-      titulo: 'Clase de Yoga Matutina',
-      tipo: 'clase',
-      fecha: new Date(Date.now() + 2 * 60 * 60 * 1000), // En 2 horas
-      entrenador: 'María López'
-    },
-    {
-      id: '3',
-      titulo: 'Sesión de Crossfit',
-      tipo: 'clase',
-      fecha: new Date(Date.now() + 4 * 60 * 60 * 1000), // En 4 horas
-      entrenador: 'Roberto Sánchez'
-    }
-  ];
+  // Cargar eventos próximos (dentro de 3 días)
+  useEffect(() => {
+    const cargarEventosProximos = async () => {
+      try {
+        setLoadingEventos(true);
+        const ahora = new Date();
+        const enTresDias = addDays(ahora, 3);
+        
+        // Formatear fechas para la consulta
+        const fechaHoy = format(ahora, 'yyyy-MM-dd');
+        const fechaLimite = format(enTresDias, 'yyyy-MM-dd');
+
+        const { data, error } = await supabase
+          .from('eventos')
+          .select('id, titulo, tipo, fecha, hora, cliente_nombre, entrenador')
+          .gte('fecha', fechaHoy)
+          .lte('fecha', fechaLimite)
+          .eq('estado', 'programado')
+          .order('fecha', { ascending: true })
+          .order('hora', { ascending: true });
+
+        if (error) {
+          console.error('Error al cargar eventos próximos:', error);
+          return;
+        }
+
+        // Filtrar eventos que aún no han pasado y transformar al formato esperado
+        const eventosTransformados: EventoProximo[] = (data || [])
+          .map(evento => ({
+            id: evento.id,
+            titulo: evento.titulo,
+            tipo: evento.tipo,
+            fecha: new Date(`${evento.fecha}T${evento.hora}`),
+            cliente: evento.cliente_nombre,
+            entrenador: evento.entrenador
+          }))
+          .filter(evento => evento.fecha >= ahora);
+
+        setEventosProximos(eventosTransformados);
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setLoadingEventos(false);
+      }
+    };
+
+    cargarEventosProximos();
+    
+    // Actualizar cada 5 minutos
+    const interval = setInterval(cargarEventosProximos, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const obtenerTiempoRelativo = (fecha: Date) => {
     const ahora = new Date();
     const diferencia = fecha.getTime() - ahora.getTime();
-    const horas = Math.floor(diferencia / (1000 * 60 * 60));
+    const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+    const horas = Math.floor((diferencia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutos = Math.floor((diferencia % (1000 * 60 * 60)) / (1000 * 60));
 
-    if (horas === 0) {
+    if (dias === 0 && horas === 0) {
       return `En ${minutos} min`;
-    } else if (horas < 24) {
+    } else if (dias === 0) {
       return `En ${horas}h ${minutos}min`;
+    } else if (dias === 1) {
+      return `Mañana ${format(fecha, 'HH:mm')}`;
+    } else {
+      return `En ${dias} días - ${format(fecha, 'dd/MM HH:mm')}`;
     }
-    return format(fecha, 'HH:mm', { locale: es });
   };
 
   const obtenerColorTipo = (tipo: string) => {
@@ -100,7 +144,7 @@ export function GymLayout({ user }: GymLayoutProps) {
             </div>
             <div className="flex items-center gap-2 md:gap-4">
               <DropdownMenu open={notificacionesAbiertas} onOpenChange={setNotificacionesAbiertas}>
-                {/* <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-4 w-4 md:h-5 md:w-5" />
                     {eventosProximos.length > 0 && (
@@ -111,13 +155,13 @@ export function GymLayout({ user }: GymLayoutProps) {
                       </Badge>
                     )}
                   </Button>
-                </DropdownMenuTrigger> */}
+                </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-72 md:w-80" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">Próximos Eventos</p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        Eventos en las próximas 24 horas
+                        Eventos en los próximos 3 días
                       </p>
                     </div>
                   </DropdownMenuLabel>
@@ -164,12 +208,12 @@ export function GymLayout({ user }: GymLayoutProps) {
                   )}
 
                   <DropdownMenuSeparator />
-                  {/* <DropdownMenuItem
+                  <DropdownMenuItem
                     className="text-center justify-center text-blue-600 hover:text-blue-700"
-                    onClick={() => router.push('/calendario')}
+                    onClick={() => navigate('/calendario')}
                   >
                     Ver todos los eventos
-                  </DropdownMenuItem> */}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <DropdownMenu>

@@ -17,10 +17,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Cliente } from "./types";
-import { format, addMonths } from "date-fns";
+import { format, addMonths, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
-import { User2, Star, CalendarRange, QrCode } from "lucide-react";
+import { User2, Star, CalendarRange, QrCode, Wallet, CreditCard } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/lib/supabase";
 
 export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
@@ -77,6 +80,26 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
       },
   });
 
+  // Estados para pago en cuotas
+  const [pagoEnCuotas, setPagoEnCuotas] = useState(false);
+  const [montoAdelanto, setMontoAdelanto] = useState<number>(0);
+  const [numCuotas, setNumCuotas] = useState<number>(1);
+  const [metodoPago, setMetodoPago] = useState<string>("efectivo");
+
+  // Obtener precio de membresía seleccionada
+  const membresiaSeleccionadaId = form.watch("membresia_id");
+  const membresiaSeleccionada = membresiasDisponibles.find(m => m.id === membresiaSeleccionadaId);
+  const precioMembresia = membresiaSeleccionada?.precio || 0;
+  const saldoPendiente = precioMembresia - montoAdelanto;
+
+  // Resetear cuotas cuando cambia la membresía
+  useEffect(() => {
+    if (membresiaSeleccionada) {
+      setMontoAdelanto(0);
+      setPagoEnCuotas(false);
+    }
+  }, [membresiaSeleccionadaId]);
+
   // Función para calcular fecha de vencimiento
   const calcularFechaVencimiento = (membresiaId: string) => {
     const membresiaSeleccionada = membresiasDisponibles.find(m => m.id === membresiaId);
@@ -104,36 +127,103 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
   }, [form, membresiasDisponibles]);
 
   useEffect(() => {
-    if (clienteActual) {
-      form.reset({
-        nombre: clienteActual.nombre,
-        email: clienteActual.email,
-        telefono: clienteActual.telefono,
-        dni: clienteActual.dni || "",
-        fecha_nacimiento: clienteActual.fecha_nacimiento || "",
-        membresia_id: clienteActual.membresia_id || "",
-        fecha_inicio: clienteActual.fecha_inicio ? clienteActual.fecha_inicio.split('T')[0] : "",
-        fecha_fin: clienteActual.fecha_fin ? clienteActual.fecha_fin.split('T')[0] : "",
-        codigo_qr: (clienteActual as any)?.codigo_qr || "",
-      });
-    } else {
-      form.reset({
-        nombre: "",
-        email: "",
-        telefono: "",
-        fecha_nacimiento: "",
-        membresia_id: "",
-        fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
-        fecha_fin: "",
-        codigo_qr: "",
-      });
+    if (isOpen) {
+      // Reiniciar el paso al primero cada vez que se abre el modal
+      setStep(0);
+      // Resetear estados de cuotas
+      setPagoEnCuotas(false);
+      setMontoAdelanto(0);
+      setNumCuotas(1);
+      setMetodoPago("efectivo");
+      
+      if (clienteActual) {
+        form.reset({
+          nombre: clienteActual.nombre,
+          email: clienteActual.email,
+          telefono: clienteActual.telefono,
+          dni: clienteActual.dni || "",
+          fecha_nacimiento: clienteActual.fecha_nacimiento || "",
+          membresia_id: clienteActual.membresia_id || "",
+          fecha_inicio: clienteActual.fecha_inicio ? clienteActual.fecha_inicio.split('T')[0] : "",
+          fecha_fin: clienteActual.fecha_fin ? clienteActual.fecha_fin.split('T')[0] : "",
+          codigo_qr: (clienteActual as any)?.codigo_qr || "",
+        });
+      } else {
+        form.reset({
+          nombre: "",
+          email: "",
+          telefono: "",
+          dni: "",
+          fecha_nacimiento: "",
+          membresia_id: "",
+          fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
+          fecha_fin: "",
+          codigo_qr: "",
+        });
+      }
     }
-  }, [clienteActual, form]);
+  }, [isOpen, clienteActual, form]);
 
   const { toast } = useToast();
 
-  const handleSubmit = form.handleSubmit((values) => {
-    onSubmit(values);
+  const handleSubmit = form.handleSubmit(async (values) => {
+    try {
+      // Si hay saveCliente disponible, usarlo para obtener el cliente creado
+      if (saveCliente) {
+        const clienteCreado = await saveCliente(values, { closeDialog: false });
+        
+        // Si es un nuevo cliente y tiene pago en cuotas, crear el plan de pago
+        if (!clienteActual && clienteCreado && membresiaSeleccionada) {
+          // Crear registro de pago
+          const { data: pagoData, error: pagoError } = await supabase
+            .from('pagos')
+            .insert({
+              cliente_id: clienteCreado.id,
+              membresia_id: membresiaSeleccionada.id,
+              monto_total: precioMembresia,
+              monto_pagado: pagoEnCuotas ? montoAdelanto : precioMembresia,
+              nombre_membresia: membresiaSeleccionada.nombre,
+              num_cuotas: pagoEnCuotas ? numCuotas : 0,
+              estado: pagoEnCuotas && saldoPendiente > 0 ? 'parcial' : 'pagado',
+              notas: pagoEnCuotas ? `Adelanto: S/ ${montoAdelanto.toFixed(2)}` : null
+            })
+            .select()
+            .single();
+
+          if (pagoError) {
+            console.error('Error al crear pago:', pagoError);
+            toast({
+              variant: "destructive",
+              title: "Advertencia",
+              description: "Cliente creado, pero hubo un error al registrar el pago"
+            });
+          } else if (pagoData) {
+            // Crear transacción inicial (adelanto o pago completo)
+            const montoInicial = pagoEnCuotas ? montoAdelanto : precioMembresia;
+            if (montoInicial > 0) {
+              const { error: transError } = await supabase
+                .from('transacciones')
+                .insert({
+                  pago_id: pagoData.id,
+                  cliente_id: clienteCreado.id,
+                  monto: montoInicial,
+                  tipo: pagoEnCuotas ? 'adelanto' : 'pago_completo',
+                  metodo_pago: metodoPago,
+                  notas: pagoEnCuotas ? 'Pago inicial al registrar cliente' : 'Pago completo de membresía'
+                });
+
+              if (transError) {
+                console.error('Error al crear transacción:', transError);
+              }
+            }
+          }
+        }
+      } else {
+        onSubmit(values);
+      }
+    } catch (error) {
+      console.error('Error en submit:', error);
+    }
   });
 
   const validateCurrentStep = async () => {
@@ -430,6 +520,111 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                     </FormItem>
                   )}
                 />
+
+                {/* Sección de Pago en Cuotas - Solo para nuevo cliente */}
+                {!clienteActual && membresiaSeleccionada && (
+                  <div className="border rounded-lg p-4 mt-4 space-y-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-muted-foreground" />
+                        <Label htmlFor="pago-cuotas" className="font-medium">Pago en cuotas</Label>
+                      </div>
+                      <Switch
+                        id="pago-cuotas"
+                        checked={pagoEnCuotas}
+                        onCheckedChange={setPagoEnCuotas}
+                      />
+                    </div>
+
+                    {!pagoEnCuotas && (
+                      <div className="text-sm text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Precio de membresía:</span>
+                          <span className="font-medium text-foreground">S/ {precioMembresia.toFixed(2)}</span>
+                        </div>
+                        <p className="mt-2 text-xs">El cliente pagará el monto completo al registrarse.</p>
+                      </div>
+                    )}
+
+                    {pagoEnCuotas && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm">Precio total</Label>
+                            <div className="text-lg font-bold">S/ {precioMembresia.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Saldo pendiente</Label>
+                            <div className="text-lg font-bold text-orange-600">
+                              S/ {saldoPendiente > 0 ? saldoPendiente.toFixed(2) : '0.00'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="adelanto" className="text-sm">Monto de adelanto (S/)</Label>
+                          <Input
+                            id="adelanto"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={precioMembresia}
+                            value={montoAdelanto}
+                            onChange={(e) => setMontoAdelanto(Math.min(parseFloat(e.target.value) || 0, precioMembresia))}
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="num-cuotas" className="text-sm">Número de cuotas (máx. 2)</Label>
+                          <Select value={String(numCuotas)} onValueChange={(v) => setNumCuotas(Number(v))}>
+                            <SelectTrigger className="text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 cuota</SelectItem>
+                              <SelectItem value="2">2 cuotas</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="metodo-pago" className="text-sm">Método de pago (adelanto)</Label>
+                          <Select value={metodoPago} onValueChange={setMetodoPago}>
+                            <SelectTrigger className="text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="efectivo">Efectivo</SelectItem>
+                              <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                              <SelectItem value="transferencia">Transferencia</SelectItem>
+                              <SelectItem value="yape">Yape</SelectItem>
+                              <SelectItem value="plin">Plin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {saldoPendiente > 0 && (
+                          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                            <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">Plan de cuotas:</p>
+                            <ul className="text-sm text-blue-700 dark:text-blue-300 mt-1 space-y-1">
+                              {Array.from({ length: numCuotas }, (_, i) => {
+                                const montoCuota = saldoPendiente / numCuotas;
+                                const fechaCuota = addDays(new Date(), (i + 1) * 7);
+                                return (
+                                  <li key={i} className="flex justify-between">
+                                    <span>Cuota {i + 1} - {format(fechaCuota, 'dd/MM/yyyy')}</span>
+                                    <span className="font-medium">S/ {montoCuota.toFixed(2)}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

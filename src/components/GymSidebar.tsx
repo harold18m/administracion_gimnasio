@@ -11,7 +11,8 @@ import {
   Fingerprint,
   CreditCard,
   User,
-  UserCheck
+  UserCheck,
+  Wallet
 } from 'lucide-react';
 import {
   Sidebar,
@@ -52,6 +53,7 @@ const sidebarSections: { label: string; items: SidebarItem[] }[] = [
       { icon: Users, label: 'Clientes', href: '/clientes' },
       { icon: Dumbbell, label: 'Ejercicios', href: '/rutinas' },
       { icon: CreditCard, label: 'Membresías', href: '/membresias' },
+      { icon: Wallet, label: 'Pagos', href: '/pagos' },
       { icon: Calendar, label: 'Calendario', href: '/calendario' },
     ],
   },

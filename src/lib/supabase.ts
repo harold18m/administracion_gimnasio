@@ -262,6 +262,88 @@ export interface Database {
           updated_at?: string
         }
       }
+      , pagos: {
+        Row: {
+          id: string
+          cliente_id: string
+          membresia_id: string | null
+          monto_total: number
+          monto_pagado: number
+          nombre_membresia: string | null
+          fecha_inicio: string
+          estado: 'pendiente' | 'parcial' | 'pagado' | 'vencido'
+          num_cuotas: number
+          notas: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          cliente_id: string
+          membresia_id?: string | null
+          monto_total: number
+          monto_pagado?: number
+          nombre_membresia?: string | null
+          fecha_inicio?: string
+          estado?: 'pendiente' | 'parcial' | 'pagado' | 'vencido'
+          num_cuotas?: number
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          cliente_id?: string
+          membresia_id?: string | null
+          monto_total?: number
+          monto_pagado?: number
+          nombre_membresia?: string | null
+          fecha_inicio?: string
+          estado?: 'pendiente' | 'parcial' | 'pagado' | 'vencido'
+          num_cuotas?: number
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      , transacciones: {
+        Row: {
+          id: string
+          pago_id: string
+          cliente_id: string
+          monto: number
+          tipo: 'adelanto' | 'cuota' | 'pago_completo'
+          numero_cuota: number | null
+          metodo_pago: string
+          fecha_transaccion: string
+          notas: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pago_id: string
+          cliente_id: string
+          monto: number
+          tipo: 'adelanto' | 'cuota' | 'pago_completo'
+          numero_cuota?: number | null
+          metodo_pago?: string
+          fecha_transaccion?: string
+          notas?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pago_id?: string
+          cliente_id?: string
+          monto?: number
+          tipo?: 'adelanto' | 'cuota' | 'pago_completo'
+          numero_cuota?: number | null
+          metodo_pago?: string
+          fecha_transaccion?: string
+          notas?: string | null
+          created_at?: string
+        }
+      }
     }
     Functions: {
       get_days_remaining: {

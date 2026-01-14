@@ -15,6 +15,7 @@ import Membresias from "./pages/Membresias";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
 import Kiosko from "./pages/Kiosko";
+import Pagos from "./pages/Pagos";
 import NotFound from "./pages/NotFound";
 import { useState, useEffect, createContext, useContext } from "react";
 import Perfil from "./pages/Perfil";
@@ -99,6 +100,7 @@ const App = () => {
                 < Route path="/rutinas" element={<Rutinas />} />
                 {/* Página de WhatsApp eliminada */}
                 <Route path="/calendario" element={<Calendario />} />
+                <Route path="/pagos" element={<Pagos />} />
                 <Route path="/configuracion" element={<Configuracion />} />
               </Route>
 
