@@ -490,13 +490,7 @@ export default function Kiosko() {
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                     <div className="max-w-sm w-[90%] rounded-2xl bg-white shadow-2xl overflow-hidden">
                       {/* Header verde */}
-                      <div className="bg-emerald-500 px-6 py-8 text-center relative">
-                        <button 
-                          onClick={() => setOverlayVisible(false)}
-                          className="absolute top-3 right-3 text-white/80 hover:text-white text-xl font-bold"
-                        >
-                          ×
-                        </button>
+                      <div className="bg-emerald-500 px-6 py-8 text-center">
                         <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-white/20 flex items-center justify-center">
                           <CheckCircle2 className="h-10 w-10 text-white" />
                         </div>
