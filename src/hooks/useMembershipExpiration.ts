@@ -89,7 +89,9 @@ export const useMembershipExpiration = () => {
   };
 
   // Calcular estado de membresía basado en fecha de vencimiento en hora local
-  const getMembershipStatus = (fechaFin: string | null): 'activa' | 'vencida' | 'por_vencer' => {
+  const getMembershipStatus = (fechaFin: string | null, membresiaId?: string | null): 'activa' | 'vencida' | 'por_vencer' | 'inactiva' => {
+    // Si no tiene membresía asignada, está inactiva
+    if (!membresiaId && !fechaFin) return 'inactiva';
     if (!fechaFin) return 'activa';
     const diffDays = diffDaysFromTodayLocal(fechaFin);
     if (diffDays === null) return 'activa';
@@ -99,7 +101,7 @@ export const useMembershipExpiration = () => {
   };
 
   // Obtener color del badge según el estado
-  const getStatusColor = (status: 'activa' | 'vencida' | 'por_vencer') => {
+  const getStatusColor = (status: 'activa' | 'vencida' | 'por_vencer' | 'inactiva') => {
     switch (status) {
       case 'activa':
         return 'bg-green-500';
@@ -107,13 +109,15 @@ export const useMembershipExpiration = () => {
         return 'bg-red-500';
       case 'por_vencer':
         return 'bg-yellow-500';
+      case 'inactiva':
+        return 'bg-gray-500';
       default:
         return 'bg-gray-500';
     }
   };
 
   // Obtener texto del estado
-  const getStatusText = (status: 'activa' | 'vencida' | 'por_vencer') => {
+  const getStatusText = (status: 'activa' | 'vencida' | 'por_vencer' | 'inactiva') => {
     switch (status) {
       case 'activa':
         return 'Activa';
@@ -121,6 +125,8 @@ export const useMembershipExpiration = () => {
         return 'Vencida';
       case 'por_vencer':
         return 'Por vencer';
+      case 'inactiva':
+        return 'Inactiva';
       default:
         return 'Desconocido';
     }

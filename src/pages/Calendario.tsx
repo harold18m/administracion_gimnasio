@@ -246,78 +246,74 @@ const Calendario = () => {
                 </Select>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="fecha">Fecha</Label>
-                  <Input
-                    id="fecha"
-                    type="date"
-                    value={nuevoEvento.fecha || ''}
-                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, fecha: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="hora">Hora</Label>
-                  <Input
-                    id="hora"
-                    type="time"
-                    value={nuevoEvento.hora || ''}
-                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, hora: e.target.value })}
-                  />
-                </div>
-              </div>
-              
               <div>
-                <Label htmlFor="entrenador">Entrenador</Label>
+                <Label htmlFor="fecha">Fecha</Label>
                 <Input
-                  id="entrenador"
-                  value={nuevoEvento.entrenador || ''}
-                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, entrenador: e.target.value })}
-                  placeholder="Nombre del entrenador"
+                  id="fecha"
+                  type="date"
+                  value={nuevoEvento.fecha || ''}
+                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, fecha: e.target.value })}
                 />
               </div>
-              
+
               <div>
-                <Label htmlFor="capacidad">Capacidad Máxima</Label>
-                <Input
-                  id="capacidad"
-                  type="number"
-                  value={nuevoEvento.max_participantes ?? 0}
-                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, max_participantes: parseInt(e.target.value) || 0 })}
-                  placeholder="10"
-                />
+                <Label>Hora</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Select 
+                    value={nuevoEvento.hora ? nuevoEvento.hora.split(':')[0] : ''} 
+                    onValueChange={(hour) => {
+                      const currentMinute = nuevoEvento.hora?.split(':')[1] || '00';
+                      setNuevoEvento({ ...nuevoEvento, hora: `${hour}:${currentMinute}` });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Hora" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="06">6:00 AM</SelectItem>
+                      <SelectItem value="07">7:00 AM</SelectItem>
+                      <SelectItem value="08">8:00 AM</SelectItem>
+                      <SelectItem value="09">9:00 AM</SelectItem>
+                      <SelectItem value="10">10:00 AM</SelectItem>
+                      <SelectItem value="11">11:00 AM</SelectItem>
+                      <SelectItem value="12">12:00 PM</SelectItem>
+                      <SelectItem value="13">1:00 PM</SelectItem>
+                      <SelectItem value="14">2:00 PM</SelectItem>
+                      <SelectItem value="15">3:00 PM</SelectItem>
+                      <SelectItem value="16">4:00 PM</SelectItem>
+                      <SelectItem value="17">5:00 PM</SelectItem>
+                      <SelectItem value="18">6:00 PM</SelectItem>
+                      <SelectItem value="19">7:00 PM</SelectItem>
+                      <SelectItem value="20">8:00 PM</SelectItem>
+                      <SelectItem value="21">9:00 PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select 
+                    value={nuevoEvento.hora?.split(':')[1] || '00'} 
+                    onValueChange={(minute) => {
+                      const currentHour = nuevoEvento.hora?.split(':')[0] || '08';
+                      setNuevoEvento({ ...nuevoEvento, hora: `${currentHour}:${minute}` });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Min" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="00">:00</SelectItem>
+                      <SelectItem value="30">:30</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="precio">Precio</Label>
-                  <Input
-                    id="precio"
-                    type="number"
-                    step="0.01"
-                    value={Number(nuevoEvento.precio ?? 0)}
-                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, precio: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="descripcion">Descripción</Label>
-                  <Textarea
-                    id="descripcion"
-                    value={nuevoEvento.descripcion || ''}
-                    onChange={(e) => setNuevoEvento({ ...nuevoEvento, descripcion: e.target.value })}
-                    placeholder="Detalles adicionales..."
-                  />
-                </div>
-              </div>
-              
               <div>
-                <Label htmlFor="notas">Notas</Label>
+                <Label htmlFor="descripcion">Descripción</Label>
                 <Textarea
-                  id="notas"
-                  value={nuevoEvento.notas || ''}
-                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, notas: e.target.value })}
-                  placeholder="Información adicional (ubicación, recordatorios, etc.)"
+                  id="descripcion"
+                  value={nuevoEvento.descripcion || ''}
+                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, descripcion: e.target.value })}
+                  placeholder="Detalles adicionales..."
+                  rows={3}
                 />
               </div>
               

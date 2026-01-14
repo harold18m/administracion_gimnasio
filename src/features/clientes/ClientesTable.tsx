@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Edit, Trash2, Calendar, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Edit, Trash2, Calendar, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Database } from "@/lib/supabase";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
@@ -32,6 +32,7 @@ interface ClientesTableProps {
   onBusquedaChange: (value: string) => void;
   onEdit: (cliente: ClienteRow) => void;
   onDelete: (id: string) => void;
+  onRenovar?: (cliente: ClienteRow) => void;
 }
 
 export function ClientesTable({
@@ -40,6 +41,7 @@ export function ClientesTable({
   onBusquedaChange,
   onEdit,
   onDelete,
+  onRenovar,
 }: ClientesTableProps) {
   const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
   const [page, setPage] = useState(1);
@@ -76,7 +78,6 @@ export function ClientesTable({
               <TableRow>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Contacto</TableHead>
-                <TableHead>Fecha Nacimiento</TableHead>
                 <TableHead>Membresía</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
@@ -85,13 +86,13 @@ export function ClientesTable({
             <TableBody>
               {visibles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
+                <TableCell colSpan={5} className="text-center py-4">
                     No se encontraron clientes
                   </TableCell>
                 </TableRow>
               ) : (
                 visibles.map((cliente) => {
-                  const status = getMembershipStatus(cliente.fecha_fin);
+                  const status = getMembershipStatus(cliente.fecha_fin, cliente.membresia_id);
                   return (
                   <TableRow key={cliente.id}>
                     <TableCell>
@@ -118,12 +119,6 @@ export function ClientesTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      {cliente.fecha_nacimiento ? 
-                        new Date(cliente.fecha_nacimiento).toLocaleDateString() : 
-                        'No especificada'
-                      }
-                    </TableCell>
-                    <TableCell>
                       <div>
                         <p className="font-medium">{cliente.nombre_membresia || 'Sin membresía'}</p>
                         {cliente.tipo_membresia && (
@@ -134,14 +129,14 @@ export function ClientesTable({
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Badge 
-                          variant={status === 'active' ? 'default' : status === 'expiring' ? 'destructive' : 'secondary'}
+                          variant={status === 'activa' ? 'default' : status === 'por_vencer' ? 'destructive' : 'secondary'}
                           className={`${getStatusColor(status)} flex items-center space-x-1`}
                         >
-                          {status === 'expiring' && <AlertTriangle className="h-3 w-3" />}
-                          {status === 'active' && <Calendar className="h-3 w-3" />}
+                          {status === 'por_vencer' && <AlertTriangle className="h-3 w-3" />}
+                          {status === 'activa' && <Calendar className="h-3 w-3" />}
                           <span>{getStatusText(status)}</span>
                         </Badge>
-                        {cliente.fecha_fin && (
+                        {cliente.fecha_fin && status !== 'inactiva' && (
                           <span className="text-xs text-muted-foreground">
                             {formatISODate(cliente.fecha_fin)}
                           </span>
@@ -149,11 +144,22 @@ export function ClientesTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-1">
+                        {onRenovar && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onRenovar(cliente)}
+                            title="Renovar membresía"
+                          >
+                            <RefreshCw className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => onEdit(cliente)}
+                          title="Editar cliente"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -161,6 +167,7 @@ export function ClientesTable({
                           variant="ghost"
                           size="icon"
                           onClick={() => onDelete(cliente.id)}
+                          title="Eliminar cliente"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
@@ -181,7 +188,7 @@ export function ClientesTable({
             </div>
           ) : (
             visibles.map((cliente) => {
-              const status = getMembershipStatus(cliente.fecha_fin);
+              const status = getMembershipStatus(cliente.fecha_fin, cliente.membresia_id);
               return (
                 <Card key={cliente.id} className="p-4">
                   <div className="flex items-start justify-between mb-3">
@@ -199,6 +206,15 @@ export function ClientesTable({
                       </div>
                     </div>
                     <div className="flex space-x-1">
+                      {onRenovar && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRenovar(cliente)}
+                        >
+                          <RefreshCw className="h-4 w-4 text-green-600" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -225,29 +241,20 @@ export function ClientesTable({
                       <p className="text-muted-foreground">Teléfono:</p>
                       <p>{cliente.telefono}</p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Fecha Nacimiento:</p>
-                      <p>
-                        {cliente.fecha_nacimiento ? 
-                          new Date(cliente.fecha_nacimiento).toLocaleDateString() : 
-                          'No especificada'
-                        }
-                      </p>
-                    </div>
                     <div className="flex flex-wrap gap-2 pt-2">
                       <Badge variant="default" className="text-xs">
                         {cliente.nombre_membresia || 'Sin membresía'}
                       </Badge>
                       <Badge 
-                        variant={status === 'active' ? 'default' : status === 'expiring' ? 'destructive' : 'secondary'}
+                        variant={status === 'activa' ? 'default' : status === 'por_vencer' ? 'destructive' : 'secondary'}
                         className={`${getStatusColor(status)} flex items-center space-x-1 text-xs`}
                       >
-                        {status === 'expiring' && <AlertTriangle className="h-3 w-3" />}
-                        {status === 'active' && <Calendar className="h-3 w-3" />}
+                        {status === 'por_vencer' && <AlertTriangle className="h-3 w-3" />}
+                        {status === 'activa' && <Calendar className="h-3 w-3" />}
                         <span>{getStatusText(status)}</span>
                       </Badge>
                     </div>
-                    {cliente.fecha_fin && (
+                    {cliente.fecha_fin && status !== 'inactiva' && (
                       <div className="pt-1">
                         <p className="text-xs text-muted-foreground">
                           Vence: {formatISODate(cliente.fecha_fin)}

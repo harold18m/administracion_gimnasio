@@ -12,7 +12,8 @@ import {
   CreditCard,
   User,
   UserCheck,
-  Wallet
+  Wallet,
+  Megaphone
 } from 'lucide-react';
 import {
   Sidebar,
@@ -61,6 +62,7 @@ const sidebarSections: { label: string; items: SidebarItem[] }[] = [
     label: 'Config',
     items: [
       { icon: Settings, label: 'Configuración', href: '/configuracion' },
+      { icon: Megaphone, label: 'Anuncios', href: '/anuncios' },
     ],
   },
 ];

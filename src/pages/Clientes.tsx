@@ -1,11 +1,16 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 import { ClientesTable } from "@/features/clientes/ClientesTable";
 import { ClienteForm } from "@/features/clientes/ClienteForm";
 import { ClienteEditForm } from "@/features/clientes/ClienteEditForm";
+import { RenovarMembresiaModal } from "@/features/clientes/RenovarMembresiaModal";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useClientes } from "@/features/clientes/useClientes";
+import type { Database } from "@/lib/supabase";
+
+type ClienteRow = Database['public']['Tables']['clientes']['Row'];
 
 export default function Clientes() {
   const {
@@ -26,7 +31,22 @@ export default function Clientes() {
     handleAddNew,
     membresiasDisponibles,
     saveCliente,
+    fetchClientes,
   } = useClientes();
+
+  // Estado para el modal de renovación
+  const [isRenovarOpen, setIsRenovarOpen] = useState(false);
+  const [clienteARenovar, setClienteARenovar] = useState<ClienteRow | null>(null);
+
+  const handleRenovar = (cliente: ClienteRow) => {
+    setClienteARenovar(cliente);
+    setIsRenovarOpen(true);
+  };
+
+  const handleRenovacionExitosa = () => {
+    // Recargar la lista de clientes
+    fetchClientes();
+  };
 
   const handleEditSubmit = async (values: any) => {
     await saveCliente(values, { closeDialog: true });
@@ -48,6 +68,7 @@ export default function Clientes() {
         onBusquedaChange={setBusqueda}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onRenovar={handleRenovar}
       />
 
       {/* Modal para CREAR nuevo cliente */}
@@ -71,6 +92,15 @@ export default function Clientes() {
         />
       )}
 
+      {/* Modal para RENOVAR membresía */}
+      <RenovarMembresiaModal
+        isOpen={isRenovarOpen}
+        onOpenChange={setIsRenovarOpen}
+        cliente={clienteARenovar}
+        membresiasDisponibles={membresiasDisponibles}
+        onRenovacionExitosa={handleRenovacionExitosa}
+      />
+
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
@@ -84,3 +114,4 @@ export default function Clientes() {
     </div>
   );
 }
+

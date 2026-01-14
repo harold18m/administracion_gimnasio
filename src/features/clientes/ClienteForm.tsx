@@ -170,9 +170,10 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
     try {
       // Si hay saveCliente disponible, usarlo para obtener el cliente creado
       if (saveCliente) {
-        const clienteCreado = await saveCliente(values, { closeDialog: false });
+        // closeDialog: true hace que saveCliente cierre el modal después de guardar
+        const clienteCreado = await saveCliente(values, { closeDialog: true });
         
-        // Si es un nuevo cliente y tiene pago en cuotas, crear el plan de pago
+        // Si es un nuevo cliente y tiene membresía, crear el plan de pago
         if (!clienteActual && clienteCreado && membresiaSeleccionada) {
           // Crear registro de pago
           const { data: pagoData, error: pagoError } = await supabase
@@ -192,16 +193,11 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
 
           if (pagoError) {
             console.error('Error al crear pago:', pagoError);
-            toast({
-              variant: "destructive",
-              title: "Advertencia",
-              description: "Cliente creado, pero hubo un error al registrar el pago"
-            });
           } else if (pagoData) {
             // Crear transacción inicial (adelanto o pago completo)
             const montoInicial = pagoEnCuotas ? montoAdelanto : precioMembresia;
             if (montoInicial > 0) {
-              const { error: transError } = await supabase
+              await supabase
                 .from('transacciones')
                 .insert({
                   pago_id: pagoData.id,
@@ -211,18 +207,21 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                   metodo_pago: metodoPago,
                   notas: pagoEnCuotas ? 'Pago inicial al registrar cliente' : 'Pago completo de membresía'
                 });
-
-              if (transError) {
-                console.error('Error al crear transacción:', transError);
-              }
             }
           }
         }
+        // El modal se cierra automáticamente por saveCliente con closeDialog: true
       } else {
         onSubmit(values);
+        onOpenChange(false);
       }
     } catch (error) {
       console.error('Error en submit:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo guardar el cliente"
+      });
     }
   });
 
@@ -358,39 +357,73 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="items-center text-center">
-          <DialogTitle className="text-lg md:text-xl">
-            {clienteActual ? "Editar Cliente" : "Nuevo Cliente"}
-          </DialogTitle>
-          <DialogDescription className="text-sm">
-            {clienteActual
-              ? "Modifica los datos del cliente"
-              : "Completa los datos para registrar un nuevo cliente"}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="mb-4">
-          <div className="flex items-center justify-center gap-6">
+      <DialogContent 
+        className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        {/* Header con gradiente */}
+        <div className="bg-gradient-to-r from-primary/90 to-primary px-6 py-5 rounded-t-lg">
+          <DialogHeader className="items-center text-center text-white">
+            <div className="h-12 w-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center mb-2">
+              <User2 className="h-6 w-6 text-white" />
+            </div>
+            <DialogTitle className="text-xl md:text-2xl font-bold text-white">
+              {clienteActual ? "Editar Cliente" : "Nuevo Cliente"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-white/80">
+              {clienteActual
+                ? "Modifica los datos del cliente"
+                : "Completa los datos para registrar un nuevo cliente"}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        {/* Indicador de pasos mejorado */}
+        <div className="px-6 py-4 border-b bg-muted/30">
+          <div className="flex items-center justify-center gap-2 md:gap-4">
             {steps.map((st, idx) => {
               const Icon = st.icon as any;
               const active = idx === step;
               const done = idx < step;
-              const base = active ? 'border-primary bg-primary/10 text-primary' : done ? 'border-green-600 bg-green-900/20 text-green-400' : 'border-neutral-700 bg-neutral-800 text-neutral-300';
+              const labels = ['Datos', 'Membresía', 'QR'];
               return (
-                <div key={st.key} className="flex items-center gap-4">
-                  <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full border flex items-center justify-center ${base}`}>
-                    <Icon className="h-5 w-5" />
+                <div key={st.key} className="flex items-center gap-2 md:gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className={`
+                      h-10 w-10 md:h-12 md:w-12 rounded-full border-2 flex items-center justify-center transition-all duration-300
+                      ${active 
+                        ? 'border-primary bg-primary text-white shadow-lg shadow-primary/30 scale-110' 
+                        : done 
+                          ? 'border-green-500 bg-green-500 text-white' 
+                          : 'border-muted-foreground/30 bg-muted text-muted-foreground'
+                      }
+                    `}>
+                      {done ? (
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <Icon className="h-5 w-5" />
+                      )}
+                    </div>
+                    <span className={`text-xs mt-1 font-medium ${active ? 'text-primary' : done ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      {labels[idx]}
+                    </span>
                   </div>
                   {idx < steps.length - 1 && (
-                    <div className="hidden md:block w-10 h-[1px] bg-neutral-700" />
+                    <div className={`hidden md:block w-12 lg:w-20 h-0.5 rounded transition-colors duration-300 ${done ? 'bg-green-500' : 'bg-muted-foreground/20'}`} />
                   )}
                 </div>
               );
             })}
           </div>
         </div>
-        <Form {...form}>
-          <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
+
+        {/* Contenido del formulario */}
+        <div className="px-6 py-5">
+          <Form {...form}>
+            <form onSubmit={handleSubmit} className="space-y-4">
             {/* Paso 0: Datos personales */}
             {step === 0 && (
               <div className="space-y-3 md:space-y-4">
@@ -644,7 +677,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                             <Button type="button" variant="secondary" onClick={handleGenerarCodigo}>Generar</Button>
                           </div>
                         </FormControl>
-                        <p className="text-xs text-muted-foreground mt-1">Si generas uno aquí se respetará; si lo dejas vacío, se autogenerará al guardar usando los últimos 4 dígitos de tu teléfono e ID.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Presiona "Generar" para crear un código QR. Este campo es opcional.</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -665,7 +698,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
             )}
 
             {/* Navegación */}
-            <DialogFooter className="flex-col gap-3">
+            <DialogFooter className="flex-col gap-3 pt-4 border-t">
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:items-center sm:justify-between w-full">
                 <div className="flex gap-2">
                   <DialogClose asChild>
@@ -681,8 +714,8 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                   {step < steps.length - 1 ? (
                     <Button type="button" onClick={goNext} className="text-sm">Siguiente</Button>
                   ) : (
-                    <Button type="submit" className="text-sm" disabled={form.formState.isSubmitting}>
-                      {clienteActual ? "Actualizar" : "Guardar"}
+                    <Button type="submit" className="text-sm bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" disabled={form.formState.isSubmitting}>
+                      {clienteActual ? "Actualizar" : "Guardar Cliente"}
                     </Button>
                   )}
                 </div>
@@ -690,6 +723,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
             </DialogFooter>
           </form>
         </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );

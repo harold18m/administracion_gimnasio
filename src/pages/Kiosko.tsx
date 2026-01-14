@@ -91,7 +91,7 @@ export default function Kiosko() {
         setOverlayDeniedReason(null);
         setUltimoCliente(null);
         setUltimoCodigoQR("");
-      }, 5000);
+      }, 3000);
       return;
     }
 
@@ -163,7 +163,7 @@ export default function Kiosko() {
           setOverlayDeniedReason(null);
           setUltimoCliente(null);
           setUltimoCodigoQR("");
-        }, 5000);
+        }, 3000);
         playAccessSound();
         abrirCerradura();
         return;
@@ -185,7 +185,7 @@ export default function Kiosko() {
           setOverlayDeniedReason(null);
           setUltimoCliente(null);
           setUltimoCodigoQR("");
-        }, 5000);
+        }, 3000);
         return;
       }
     }
@@ -225,7 +225,7 @@ export default function Kiosko() {
         setOverlayDeniedReason(null);
         setUltimoCliente(null);
         setUltimoCodigoQR("");
-      }, 5000);
+      }, 3000);
       playAccessSound();
       abrirCerradura();
       return;
@@ -262,7 +262,7 @@ export default function Kiosko() {
       setOverlayDeniedReason(null);
       setUltimoCliente(null);
       setUltimoCodigoQR("");
-    }, 5000);
+    }, 3000);
     // Sonido de acceso concedido
     playAccessSound();
     abrirCerradura();
@@ -324,7 +324,7 @@ export default function Kiosko() {
 
     // Anti-doble lectura en ráfaga
     const now = Date.now();
-    if (lastCodeRef.current === valor && now - lastTimeRef.current < 5000) {
+    if (lastCodeRef.current === valor && now - lastTimeRef.current < 3000) {
       return; // Ignora duplicado dentro de 5 segundos
     }
     lastCodeRef.current = valor;
@@ -355,7 +355,7 @@ export default function Kiosko() {
         setOverlayVisible(false);
         setOverlayKind(null);
         setOverlayDeniedReason(null);
-      }, 5000);
+      }, 3000);
       return;
     }
 
@@ -408,23 +408,66 @@ export default function Kiosko() {
     };
   }, []);
 
-  return (
-    <div className="min-h-screen w-full bg-neutral-950 text-white flex flex-col items-center p-6">
-      {/* Hora en la esquina superior derecha */}
-      <div className="fixed top-4 right-6 z-30">
-        <span className="px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900 text-neutral-100 font-mono text-3xl tracking-tight shadow-sm">
-          {horaActual}
-        </span>
-      </div>
-      <div className="flex flex-col items-center mb-6">
-        <div className="h-12 w-12 rounded-full bg-orange-500/10 border border-orange-500/40 flex items-center justify-center mb-2">
-          <Camera className="h-6 w-6 text-orange-400" />
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-wide">CONTROL DE ASISTENCIA</h1>
-        <p className="text-sm text-muted-foreground">Escanea tu código QR para acceder</p>
-      </div>
+  // Cargar configuración de anuncios
+  const [anuncioIzquierda, setAnuncioIzquierda] = useState<any>(null);
+  const [anuncioDerecha, setAnuncioDerecha] = useState<any>(null);
 
-      <Card className="bg-neutral-900 border-neutral-800 w-full max-w-2xl">
+  useEffect(() => {
+    const cargarAnuncios = async () => {
+      const { data } = await supabase.from('anuncios_kiosko').select('*');
+      if (data) {
+        setAnuncioIzquierda(data.find(a => a.posicion === 'izquierda' && a.activo));
+        setAnuncioDerecha(data.find(a => a.posicion === 'derecha' && a.activo));
+      }
+    };
+    cargarAnuncios();
+  }, []);
+
+  const renderAnuncio = (anuncio: any) => {
+    if (!anuncio) return <div className="flex-1 hidden lg:flex" />;
+    
+    return (
+      <div 
+        className="flex-1 hidden lg:flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-700"
+        style={{ backgroundColor: anuncio.color_fondo || 'transparent', color: anuncio.color_texto || 'white' }}
+      >
+        {anuncio.titulo && (
+          <h2 className="text-4xl font-bold mb-6 tracking-tight">{anuncio.titulo}</h2>
+        )}
+        {anuncio.tipo === 'texto' ? (
+          <p className="text-2xl leading-relaxed whitespace-pre-wrap max-w-lg">{anuncio.contenido}</p>
+        ) : anuncio.contenido ? (
+          <img 
+            src={anuncio.contenido} 
+            alt="Anuncio" 
+            className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-2xl"
+          />
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-neutral-950 text-white flex overflow-hidden">
+      {/* Panel Izquierdo */}
+      {renderAnuncio(anuncioIzquierda)}
+
+      <div className="flex-1 flex flex-col items-center p-6 justify-center relative z-10 w-full max-w-2xl mx-auto">
+        {/* Hora en la esquina superior derecha */}
+        <div className="absolute top-4 right-6 z-30">
+          <span className="px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900 text-neutral-100 font-mono text-3xl tracking-tight shadow-sm">
+            {horaActual}
+          </span>
+        </div>
+        <div className="flex flex-col items-center mb-6">
+          <div className="h-12 w-12 rounded-full bg-orange-500/10 border border-orange-500/40 flex items-center justify-center mb-2">
+            <Camera className="h-6 w-6 text-orange-400" />
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-wide">CONTROL DE ASISTENCIA</h1>
+          <p className="text-sm text-muted-foreground">Escanea tu código QR para acceder</p>
+        </div>
+ 
+        <Card className="bg-neutral-900 border-neutral-800 w-full shadow-2xl">
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-xs text-neutral-300">Puerta: {serialDisponible ? puertaEstado : "no soportado"}</div>
@@ -487,7 +530,7 @@ export default function Kiosko() {
               {/* Overlays encima de la cámara: acceso concedido o denegado */}
               {overlayVisible && (
                 overlayKind === "granted" && ultimoCliente && ultimoCliente.estado === "activa" && !estaVencidaPorFecha(ultimoCliente.fecha_fin) ? (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
                     <div className="max-w-sm w-[90%] rounded-2xl bg-white shadow-2xl overflow-hidden">
                       {/* Header verde */}
                       <div className="bg-emerald-500 px-6 py-8 text-center">
@@ -547,7 +590,7 @@ export default function Kiosko() {
                     </div>
                   </div>
                 ) : overlayKind === "denied" ? (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-950/70 backdrop-blur-sm">
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 backdrop-blur-sm">
                     <div className="max-w-md w-[92%] rounded-2xl border border-red-700/40 bg-neutral-900/90 p-6 text-center">
                       <div className="flex flex-col items-center mb-4">
                         <div className="h-16 w-16 rounded-full bg-red-600/10 border border-red-500/40 flex items-center justify-center mb-2">
@@ -574,7 +617,7 @@ export default function Kiosko() {
                             <li>Dirígete a recepción para registrarte</li>
                             <li>Verifica que tu código QR sea correcto</li>
                           </ul>
-                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 5 segundos...</div>
+                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 3 segundos...</div>
                         </div>
                       ) : overlayDeniedReason === "weekly_limit" ? (
                         <div className="rounded-xl border border-orange-700/30 bg-orange-900/10 p-4 text-left">
@@ -601,7 +644,7 @@ export default function Kiosko() {
                             <li>Espera hasta el próximo lunes para reiniciar tu contador</li>
                             <li>O actualiza tu membresía a una modalidad diaria o libre en recepción</li>
                           </ul>
-                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 5 segundos...</div>
+                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 3 segundos...</div>
                         </div>
                       ) : (
                         <div className="rounded-xl border border-red-700/30 bg-red-900/10 p-4 text-left">
@@ -649,7 +692,7 @@ export default function Kiosko() {
                               </>
                             )}
                           </ul>
-                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 5 segundos...</div>
+                          <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 3 segundos...</div>
                         </div>
                       )}
                     </div>
@@ -665,6 +708,9 @@ export default function Kiosko() {
           
         </CardContent>
       </Card>
+      </div>
+      {/* Panel Derecho */}
+      {renderAnuncio(anuncioDerecha)}
     </div>
   );
 }

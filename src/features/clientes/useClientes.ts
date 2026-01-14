@@ -178,24 +178,26 @@ export const useClientes = () => {
           .single();
 
         if (error) throw error;
-        // Determinar código QR final: respetar el proporcionado en el formulario si existe,
-        // de lo contrario autogenerar basado en DNI e ID del cliente creado
-        const generado = (values.codigo_qr && values.codigo_qr.trim().length > 0)
-          ? values.codigo_qr.trim().toUpperCase()
-          : computeCodigoQR(values.telefono || null, data.id).toUpperCase();
-        const { data: updated, error: errorCode } = await supabase
-          .from('clientes')
-          .update({ codigo_qr: generado })
-          .eq('id', data.id)
-          .select()
-          .single();
+        
+        // Solo actualizar código QR si el usuario generó uno manualmente
+        let updated = data;
+        if (values.codigo_qr && values.codigo_qr.trim().length > 0) {
+          const codigoFinal = values.codigo_qr.trim().toUpperCase();
+          const { data: updatedData, error: errorCode } = await supabase
+            .from('clientes')
+            .update({ codigo_qr: codigoFinal })
+            .eq('id', data.id)
+            .select()
+            .single();
 
-        if (errorCode) throw errorCode;
+          if (errorCode) throw errorCode;
+          updated = updatedData;
+        }
 
         setClientes([updated, ...clientes]);
         toast({
           title: "Cliente agregado",
-          description: `Se generó el código ${generado} automáticamente.`,
+          description: values.codigo_qr ? `Cliente registrado con código ${values.codigo_qr.toUpperCase()}.` : "Cliente registrado correctamente.",
         });
 
         if (options.closeDialog) {
