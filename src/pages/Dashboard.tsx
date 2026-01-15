@@ -6,14 +6,19 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  DollarSign,
+  UserCheck
 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { MembershipChart } from "@/components/dashboard/MembershipChart";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
+import { startOfMonth, subMonths } from "date-fns";
 
 // Tipo para las estadísticas del dashboard
 interface DashboardStats {
@@ -21,8 +26,8 @@ interface DashboardStats {
   clientesActivos: number;
   asistenciasHoy: number;
   aforoActual: number;
-  clasesHoy: number;
-  ingresosHoy: number;
+  ingresosMes: number;
+  retencion: number;
 }
 
 // Tipo para el estado de pagos
@@ -45,8 +50,8 @@ function useDashboardStats() {
     clientesActivos: 0,
     asistenciasHoy: 0,
     aforoActual: 0,
-    clasesHoy: 0,
-    ingresosHoy: 0,
+    ingresosMes: 0,
+    retencion: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -56,6 +61,8 @@ function useDashboardStats() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
+        
+        const startOfCurrentMonth = startOfMonth(today).toISOString();
 
         // Total clientes
         const { count: totalClientes } = await supabase
@@ -66,7 +73,8 @@ function useDashboardStats() {
         const { count: clientesActivos } = await supabase
           .from("clientes")
           .select("*", { count: "exact", head: true })
-          .eq("estado", "activa");
+          .eq("estado", "activa")
+          .gte("fecha_fin", todayISO);
 
         // Asistencias de hoy
         const { count: asistenciasHoy } = await supabase
@@ -74,44 +82,33 @@ function useDashboardStats() {
           .select("*", { count: "exact", head: true })
           .gte("fecha_asistencia", todayISO);
 
-        // Aforo actual (asistencias de las últimas 4 horas como aproximación)
-        const fourHoursAgo = new Date();
-        fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
+        // Aforo actual (asistencias de las últimas 3 horas como aproximación)
+        const threeHoursAgo = new Date();
+        threeHoursAgo.setHours(threeHoursAgo.getHours() - 3);
         const { count: aforoActual } = await supabase
           .from("asistencias")
           .select("*", { count: "exact", head: true })
-          .gte("fecha_asistencia", fourHoursAgo.toISOString());
+          .gte("fecha_asistencia", threeHoursAgo.toISOString())
+          .is("hora_salida", null); // Asumiendo que hay hora_salida, sino usar lógica de tiempo
 
-        // Clases hoy (placeholder - ajustar según tu estructura de datos)
-        const clasesHoy = 0; // TODO: Implementar cuando tengas tabla de clases
+        // Ingresos del Mes Actual
+        const { data: ingresosData } = await supabase
+          .from("transacciones")
+          .select("monto")
+          .gte("fecha_transaccion", startOfCurrentMonth);
 
-        // Ingresos estimados del día (clientes que renovaron hoy)
-        const { data: membresiasPrecio } = await supabase
-          .from("membresias")
-          .select("id, precio");
+        const ingresosMes = ingresosData?.reduce((acc, curr) => acc + Number(curr.monto), 0) || 0;
 
-        const { data: clientesRenovadosHoy } = await supabase
-          .from("clientes")
-          .select("membresia_id")
-          .gte("fecha_inicio", todayISO);
-
-        let ingresosHoy = 0;
-        if (clientesRenovadosHoy && membresiasPrecio) {
-          const precioMap = new Map(
-            membresiasPrecio.map((m) => [m.id, m.precio])
-          );
-          ingresosHoy = clientesRenovadosHoy.reduce((acc, cliente) => {
-            return acc + (precioMap.get(cliente.membresia_id || "") || 0);
-          }, 0);
-        }
+        // Tasa de Retención (Clientes activos / Total clientes) * 100
+        const retencion = totalClientes ? Math.round((clientesActivos || 0) / totalClientes * 100) : 0;
 
         setStats({
           totalClientes: totalClientes || 0,
           clientesActivos: clientesActivos || 0,
           asistenciasHoy: asistenciasHoy || 0,
           aforoActual: aforoActual || 0,
-          clasesHoy,
-          ingresosHoy,
+          ingresosMes,
+          retencion,
         });
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -213,7 +210,7 @@ function PaymentStatusPanel() {
   }
 
   return (
-    <Card>
+    <Card className="col-span-4 lg:col-span-2">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
@@ -222,33 +219,33 @@ function PaymentStatusPanel() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900">
             <CheckCircle2 className="h-8 w-8 text-green-600" />
             <div>
               <p className="text-2xl font-bold text-green-600">
                 {paymentStatus.clientesAlDia}
               </p>
-              <p className="text-sm text-muted-foreground">Al día</p>
+              <p className="text-xs text-muted-foreground">Al día</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-100 dark:border-yellow-900">
             <Clock className="h-8 w-8 text-yellow-600" />
             <div>
               <p className="text-2xl font-bold text-yellow-600">
                 {paymentStatus.clientesPorVencer}
               </p>
-              <p className="text-sm text-muted-foreground">Por vencer</p>
+              <p className="text-xs text-muted-foreground">Por vencer</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900">
             <AlertCircle className="h-8 w-8 text-red-600" />
             <div>
               <p className="text-2xl font-bold text-red-600">
                 {paymentStatus.clientesVencidos}
               </p>
-              <p className="text-sm text-muted-foreground">Vencidos</p>
+              <p className="text-xs text-muted-foreground">Vencidos</p>
             </div>
           </div>
         </div>
@@ -260,13 +257,14 @@ function PaymentStatusPanel() {
               {paymentStatus.proximosVencimientos.map((cliente) => (
                 <div
                   key={cliente.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <span className="font-medium">{cliente.nombre}</span>
+                  <span className="font-medium text-sm">{cliente.nombre}</span>
                   <Badge
                     variant={
                       cliente.dias_restantes <= 3 ? "destructive" : "secondary"
                     }
+                    className="text-xs"
                   >
                     {cliente.dias_restantes === 0
                       ? "Hoy"
@@ -289,18 +287,14 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-pulse">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">
-            Resumen de actividad del gimnasio
-          </p>
+          <div className="h-8 w-48 bg-muted rounded mb-2"></div>
+          <div className="h-4 w-64 bg-muted rounded"></div>
         </div>
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="p-6">
-              <Skeleton className="h-[80px] w-full" />
-            </Card>
+            <Card key={i} className="p-6 h-32"></Card>
           ))}
         </div>
       </div>
@@ -312,47 +306,53 @@ export default function Dashboard() {
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground">
-          Resumen de actividad del gimnasio
+          Resumen de actividad y métricas clave
         </p>
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
+          title="Ingresos (Mes)"
+          value={`S/ ${stats.ingresosMes.toLocaleString("es-PE")}`}
+          icon={DollarSign}
+          description="Ingresos acumulados este mes"
+          iconColor="text-green-500"
+        />
+        <StatCard
           title="Clientes Totales"
           value={String(stats.totalClientes)}
           icon={Users}
-          description={`${stats.clientesActivos} con membresía activa`}
+          description={`${stats.clientesActivos} activos (${stats.retencion}% tasa)`}
           iconColor="text-blue-500"
         />
         <StatCard
           title="Asistencias Hoy"
           value={String(stats.asistenciasHoy)}
           icon={Activity}
-          description={`${stats.aforoActual} personas en el gimnasio`}
-          iconColor="text-green-500"
+          description="Visitas registradas hoy"
+          iconColor="text-orange-500"
         />
         <StatCard
-          title="Clases Hoy"
-          value={String(stats.clasesHoy)}
-          icon={Calendar}
-          description="Clases programadas para hoy"
+          title="Membresías Activas"
+          value={String(stats.clientesActivos)}
+          icon={UserCheck}
+          description="Clientes con acceso permitido"
           iconColor="text-purple-500"
         />
-        <StatCard
-          title="Ingresos"
-          value={`S/ ${stats.ingresosHoy.toLocaleString("es-PE")}`}
-          icon={TrendingUp}
-          description="Ingresos estimados del día"
-          iconColor="text-green-500"
-        />
       </div>
 
-      <div className="w-full">
-        <ActivityChart />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <RevenueChart />
+        <MembershipChart />
       </div>
 
-      <div className="lg:col-span-3">
-        <PaymentStatusPanel />
+      <div className="grid grid-cols-1 md:grid-cols-8 gap-6">
+        <div className="md:col-span-5">
+          <ActivityChart />
+        </div>
+        <div className="md:col-span-3">
+          <PaymentStatusPanel />
+        </div>
       </div>
     </div>
   );

@@ -206,26 +206,7 @@ export function ClienteEditForm({ isOpen, onOpenChange, onSubmit, cliente, membr
     img.src = url;
   };
 
-  const handlePrintQR = () => {
-    const code = form.getValues("codigo_qr") || "";
-    if (!code) {
-      toast({ variant: "destructive", title: "Sin código", description: "Genera un código QR primero." });
-      return;
-    }
-    const svg = qrContainerRef.current?.querySelector('svg');
-    if (!svg) {
-      toast({ variant: "destructive", title: "QR no disponible", description: "No se encontró el SVG del QR." });
-      return;
-    }
-    const serializer = new XMLSerializer();
-    const svgStr = serializer.serializeToString(svg);
-    const printWindow = window.open('', '_blank', 'width=400,height=400');
-    if (!printWindow) return;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>QR ${code}</title></head><body style="display:flex;align-items:center;justify-content:center;height:100%;margin:0;">${svgStr}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -415,13 +396,9 @@ export function ClienteEditForm({ isOpen, onOpenChange, onSubmit, cliente, membr
                       )}
                     />
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR} className="flex-1">
+                      <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR} className="w-full">
                         <Download className="h-4 w-4 mr-2" />
                         Descargar
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={handlePrintQR} className="flex-1">
-                        <Printer className="h-4 w-4 mr-2" />
-                        Imprimir
                       </Button>
                     </div>
                   </div>

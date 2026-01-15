@@ -123,6 +123,7 @@ export const useClientes = () => {
           tipo_membresia: membresiaSeleccionada?.modalidad || null,
           fecha_inicio: values.fecha_inicio || null,
           fecha_fin: values.fecha_fin || null,
+          condicion_medica: values.condicion_medica || null,
           codigo_qr: ((values.codigo_qr && values.codigo_qr.trim().length > 0)
             ? values.codigo_qr
             : computeCodigoQR(values.telefono || null, clienteActual.id))?.toUpperCase(),
@@ -167,6 +168,7 @@ export const useClientes = () => {
           tipo_membresia: membresiaSeleccionada?.modalidad || null,
           fecha_inicio: values.fecha_inicio || null,
           fecha_fin: values.fecha_fin || null,
+          condicion_medica: values.condicion_medica || null,
           estado: 'activa',
           asistencias: 0,
         };

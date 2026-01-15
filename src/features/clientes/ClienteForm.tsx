@@ -44,6 +44,7 @@ export const formSchema = z.object({
   fecha_inicio: z.string().optional(),
   fecha_fin: z.string().optional(),
   codigo_qr: z.string().optional(),
+  condicion_medica: z.string().optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -77,6 +78,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
         fecha_fin: "",
         codigo_qr: "",
+        condicion_medica: "",
       },
   });
 
@@ -147,6 +149,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
           fecha_inicio: clienteActual.fecha_inicio ? clienteActual.fecha_inicio.split('T')[0] : "",
           fecha_fin: clienteActual.fecha_fin ? clienteActual.fecha_fin.split('T')[0] : "",
           codigo_qr: (clienteActual as any)?.codigo_qr || "",
+          condicion_medica: (clienteActual as any)?.condicion_medica || "",
         });
       } else {
         form.reset({
@@ -159,6 +162,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
           fecha_inicio: format(new Date(), "yyyy-MM-dd"), // Fecha de hoy por defecto
           fecha_fin: "",
           codigo_qr: "",
+          condicion_medica: "",
         });
       }
     }
@@ -334,27 +338,6 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
     img.src = url;
   };
 
-  const handlePrintQR = () => {
-    const code = form.getValues("codigo_qr") || "";
-    if (!code) {
-      toast({ variant: "destructive", title: "Sin código", description: "Genera o guarda el cliente para imprimir el QR." });
-      return;
-    }
-    const svg = qrContainerRef.current?.querySelector('svg');
-    if (!svg) {
-      toast({ variant: "destructive", title: "QR no disponible", description: "No se encontró el SVG del QR." });
-      return;
-    }
-    const serializer = new XMLSerializer();
-    const svgStr = serializer.serializeToString(svg);
-    const printWindow = window.open('', '_blank', 'width=400,height=400');
-    if (!printWindow) return;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>QR ${code}</title></head><body style="display:flex;align-items:center;justify-content:center;height:100%;margin:0;">${svgStr}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
@@ -487,6 +470,19 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                       <FormLabel className="text-sm">Fecha de nacimiento</FormLabel>
                       <FormControl>
                         <Input type="date" className="text-sm" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="condicion_medica"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Condición Médica</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Alergias, lesiones, etc." className="text-sm" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -691,8 +687,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleDownloadQR} className="text-sm">Descargar QR</Button>
-                  <Button type="button" variant="outline" onClick={handlePrintQR} className="text-sm">Imprimir QR</Button>
+                  <Button type="button" variant="outline" onClick={handleDownloadQR} className="text-sm w-full">Descargar QR</Button>
                 </div>
               </div>
             )}

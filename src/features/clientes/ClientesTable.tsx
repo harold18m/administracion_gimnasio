@@ -1,4 +1,3 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +22,7 @@ import { useEffect, useState } from "react";
 import type { Database } from "@/lib/supabase";
 import { useMembershipExpiration } from "@/hooks/useMembershipExpiration";
 import { formatISODate } from "@/lib/utils";
+import { ClientDetailsModal } from "./ClientDetailsModal";
 
 type ClienteRow = Database['public']['Tables']['clientes']['Row'];
 
@@ -45,6 +45,9 @@ export function ClientesTable({
 }: ClientesTableProps) {
   const { getMembershipStatus, getStatusColor, getStatusText } = useMembershipExpiration();
   const [page, setPage] = useState(1);
+  const [selectedClientDetails, setSelectedClientDetails] = useState<ClienteRow | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
   const pageSize = 15;
   const totalPages = Math.max(1, Math.ceil(clientes.length / pageSize));
   const start = (page - 1) * pageSize;
@@ -52,6 +55,11 @@ export function ClientesTable({
   const visibles = clientes.slice(start, end);
 
   useEffect(() => { setPage(1); }, [busqueda, clientes.length]);
+
+  const handleOpenDetails = (cliente: ClienteRow) => {
+    setSelectedClientDetails(cliente);
+    setIsDetailsOpen(true);
+  };
 
   return (
     <Card>
@@ -96,7 +104,11 @@ export function ClientesTable({
                   return (
                   <TableRow key={cliente.id}>
                     <TableCell>
-                      <div className="flex items-center space-x-3">
+                      <div 
+                        className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => handleOpenDetails(cliente)}
+                        title="Ver detalles"
+                      >
                         <Avatar>
                           <AvatarFallback>
                             {cliente.nombre.split(' ').map(n => n[0]).join('')}
@@ -192,7 +204,10 @@ export function ClientesTable({
               return (
                 <Card key={cliente.id} className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
+                    <div 
+                      className="flex items-center space-x-3 cursor-pointer"
+                      onClick={() => handleOpenDetails(cliente)}
+                    >
                       <Avatar className="h-10 w-10">
                         <AvatarFallback>
                           {cliente.nombre.split(' ').map(n => n[0]).join('')}
@@ -290,6 +305,12 @@ export function ClientesTable({
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      <ClientDetailsModal 
+        isOpen={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        cliente={selectedClientDetails}
+      />
     </Card>
   );
 }

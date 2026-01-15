@@ -12,6 +12,12 @@ export interface Cliente {
   fechaFin: string;
   asistencias: number;
   avatarUrl?: string;
+  fecha_nacimiento?: string;
+  membresia_id?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  condicion_medica?: string;
+  codigo_qr?: string;
 }
 
 export const clientesIniciales: Cliente[] = [

@@ -75,9 +75,12 @@ export function ActivityChart() {
               axisLine={false}
               tickFormatter={(value) => `${value}`}
             />
-            <Tooltip />
+            <Tooltip 
+              cursor={{fill: 'transparent'}}
+              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            />
             <CartesianGrid vertical={false} stroke="#f5f5f5" />
-            <Bar dataKey="asistencias" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="asistencias" fill="#3b82f6" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
