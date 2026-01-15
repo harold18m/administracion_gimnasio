@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
-import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle, BarChart3 } from "lucide-react";
+import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle, BarChart3, Maximize } from "lucide-react";
 
 export default function Kiosko() {
   const { toast } = useToast();
@@ -447,8 +447,56 @@ export default function Kiosko() {
     );
   };
 
+  // Intento de fullscreen automático (puede fallar por políticas del navegador)
+  useEffect(() => {
+    const tryFullscreen = async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (e) {
+        // Ignorar error, es esperado sin interacción
+      }
+    };
+    tryFullscreen();
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const enableFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
-    <div className="min-h-screen w-full bg-neutral-950 text-white flex overflow-hidden">
+    <div 
+      className="min-h-screen w-full bg-neutral-950 text-white flex overflow-hidden relative"
+      onClick={enableFullscreen}
+    >
+      {/* Botón discreto para fullscreen */}
+      <button 
+        onClick={toggleFullscreen}
+        className="absolute bottom-4 right-4 z-50 p-2 bg-neutral-900/50 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-full transition-colors"
+        title="Pantalla Completa"
+      >
+        <Maximize className="h-5 w-5" />
+      </button>
+
       {/* Panel Izquierdo */}
       {renderAnuncio(anuncioIzquierda)}
 

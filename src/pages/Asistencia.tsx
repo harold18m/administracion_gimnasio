@@ -28,7 +28,8 @@ import {
   Calendar, 
   CheckCircle, 
   XCircle,
-  QrCode as QrCodeIcon
+  QrCode as QrCodeIcon,
+  Monitor
 } from "lucide-react";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
@@ -55,6 +56,40 @@ export default function Asistencia() {
   const [asistencias, setAsistencias] = useState<Database["public"]["Tables"]["asistencias"]["Row"][]>([]);
   const [modoAsistencia, setModoAsistencia] = useState<"qr" | "dni">("dni");
   const { toast } = useToast();
+  // Gestión de pantallas múltiples
+  const [screens, setScreens] = useState<any[]>([]);
+  const [selectedScreenIndex, setSelectedScreenIndex] = useState<string>("0");
+
+  const detectarPantallas = async () => {
+    if ('getScreenDetails' in window) {
+      try {
+        const screenDetails = await (window as any).getScreenDetails();
+        setScreens(screenDetails.screens);
+        // Seleccionar la pantalla actual por defecto o la segunda si existe
+        const current = screenDetails.screens.find((s: any) => s.isPrimary) || screenDetails.screens[0]; 
+        const currentIndex = screenDetails.screens.indexOf(current);
+        setSelectedScreenIndex(String(currentIndex !== -1 ? currentIndex : 0));
+      } catch (e) {
+        console.error(e);
+        toast({ title: "Error", description: "Permiso denegado para detectar pantallas.", variant: "destructive" });
+      }
+    }
+  };
+
+  const abrirKiosko = () => {
+    const screen = screens[parseInt(selectedScreenIndex)];
+    let features = "noopener,noreferrer"; 
+    
+    if (screen) {
+        // En Multi-pantalla, usar coordenadas
+        // left/top + width/height matching the screen dimensions forces simple full-window
+        features += `,left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`;
+    }
+    features += ",fullscreen=yes";
+    
+    window.open("/kiosko", "_blank", features);
+  };
+  
   // Huella deshabilitada: se elimina chequeo de agente
 
   useEffect(() => {
@@ -340,12 +375,39 @@ export default function Asistencia() {
         <p className="text-muted-foreground">
           Registro de entradas al gimnasio mediante código QR o DNI
         </p>
-        <div className="pt-2">
-          <Link to="/kiosko" target="_blank" rel="noopener noreferrer">
-            <Button>
-              Abrir Kiosko
-            </Button>
-          </Link>
+        <div className="pt-2 flex flex-wrap items-center gap-3">
+          {/* Selector de Pantallas */}
+          <div className="flex items-center gap-2">
+            {!('getScreenDetails' in window) ? (
+               <Link to="/kiosko" target="_blank" rel="noopener noreferrer">
+                 <Button>Abrir Kiosko</Button>
+               </Link>
+            ) : screens.length === 0 ? (
+              <Button variant="outline" onClick={detectarPantallas}>
+                <Monitor className="mr-2 h-4 w-4" />
+                Detectar Pantallas
+              </Button>
+            ) : (
+              <>
+                <Select value={selectedScreenIndex} onValueChange={setSelectedScreenIndex}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Seleccionar pantalla" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {screens.map((s, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {s.label || `Pantalla ${i + 1}`} ({s.width}x{s.height})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={abrirKiosko}>
+                  <Monitor className="mr-2 h-4 w-4" />
+                  Abrir Kiosko
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
