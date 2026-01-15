@@ -20,6 +20,12 @@ import Anuncios from "./pages/Anuncios";
 import NotFound from "./pages/NotFound";
 import { useState, useEffect, createContext, useContext } from "react";
 import Perfil from "./pages/Perfil";
+import { ClientLayout } from "./layouts/ClientLayout";
+import ClientLogin from "./pages/client/ClientLogin";
+import ClientHome from "./pages/client/ClientHome";
+import ClientRutina from "./pages/client/ClientRutina";
+import ClientPagos from "./pages/client/ClientPagos";
+import ClientPerfil from "./pages/client/ClientPerfil";
 
 // Crear contexto de autenticación
 interface AuthContextType {
@@ -36,7 +42,25 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Componente de protección de rutas
+import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
+
+// ... previous imports ...
+
+// Componente de protección de rutas para Clientes
+const ClientProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { session, loading } = useClientAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+  }
+
+  if (!session) {
+    return <Navigate to="/app/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
 
@@ -74,6 +98,7 @@ const App = () => {
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+      <ClientAuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
@@ -85,7 +110,22 @@ const App = () => {
               <Route path="/registro" element={<Registro />} />
               <Route path="/kiosko" element={<Kiosko />} />
 
-              {/* Rutas Protegidas */}
+              {/* Rutas App Clientes */}
+              <Route path="/app/login" element={<ClientLogin />} />
+              <Route path="/app" element={
+                // Wrap Client Routes with Protected Logic
+                 <ClientProtectedRoute>
+                   <ClientLayout />
+                 </ClientProtectedRoute>
+              }>
+                <Route index element={<Navigate to="/app/home" replace />} />
+                <Route path="home" element={<ClientHome />} />
+                <Route path="rutina" element={<ClientRutina />} />
+                <Route path="pagos" element={<ClientPagos />} />
+                <Route path="perfil" element={<ClientPerfil />} />
+              </Route>
+
+              {/* Rutas Protegidas Administrativas */}
               <Route element={
                 <ProtectedRoute>
                   <GymLayout />
@@ -98,7 +138,7 @@ const App = () => {
                 <Route path="/perfil" element={<Perfil />} />
                 <Route path="/ejercicios" element={<Rutinas />} />
                 {/* Solo ruta de Rutinas */}
-                < Route path="/rutinas" element={<Rutinas />} />
+                <Route path="/rutinas" element={<Rutinas />} />
                 {/* Página de WhatsApp eliminada */}
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/pagos" element={<Pagos />} />
@@ -111,6 +151,7 @@ const App = () => {
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
+      </ClientAuthProvider>
     </AuthContext.Provider>
   );
 };
