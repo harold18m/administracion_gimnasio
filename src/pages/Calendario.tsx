@@ -270,8 +270,6 @@ const Calendario = () => {
                       <SelectValue placeholder="Hora" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="06">6:00 AM</SelectItem>
-                      <SelectItem value="07">7:00 AM</SelectItem>
                       <SelectItem value="08">8:00 AM</SelectItem>
                       <SelectItem value="09">9:00 AM</SelectItem>
                       <SelectItem value="10">10:00 AM</SelectItem>
@@ -286,6 +284,7 @@ const Calendario = () => {
                       <SelectItem value="19">7:00 PM</SelectItem>
                       <SelectItem value="20">8:00 PM</SelectItem>
                       <SelectItem value="21">9:00 PM</SelectItem>
+                      <SelectItem value="22">10:00 PM</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select 

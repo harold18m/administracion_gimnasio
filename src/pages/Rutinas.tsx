@@ -1,16 +1,16 @@
-
 import { useMemo, useState, useRef } from "react";
 import { 
   Dumbbell, 
   Plus, 
   Search, 
-  Filter, 
   Edit, 
   Trash2, 
   PlayCircle,
   Heart,
   Scan,
-  Zap 
+  Zap,
+  Copy,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,8 +48,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -58,13 +56,13 @@ import { useRutinas } from "@/features/rutinas/useRutinas";
 import { useClientes } from "@/features/clientes/useClientes";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { generateRoutinePDF } from "@/utils/pdfGenerator";
+import { ExerciseCombobox } from "@/components/ExerciseCombobox";
+import { ClientCombobox } from "@/components/ClientCombobox";
 
 type EjercicioRow = ReturnType<typeof useEjercicios>["ejercicios"][number];
 type ClienteRow = ReturnType<typeof useClientes>["clientes"][number];
-
-// Se integra con Supabase mediante hooks
 
 const coloresCategorias: { [key: string]: string } = {
   fuerza: "bg-blue-100 text-blue-800",
@@ -84,15 +82,18 @@ export default function Rutinas() {
   const { toast } = useToast();
   const { ejercicios, filteredEjercicios, busqueda, setBusqueda, createEjercicio, updateEjercicio, deleteEjercicio } = useEjercicios();
   const { clientes } = useClientes();
-  const { rutinas, fetchRutinas, createRutina, getRutinaDetalle, updateRutina, deleteRutina } = useRutinas();
-  const { updateRutinaCompleta } = useRutinas();
+  const { rutinas, fetchRutinas, createRutina, getRutinaDetalle, updateRutina, deleteRutina, updateRutinaCompleta } = useRutinas();
+  
+  // States - Ejercicios
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [ejercicioActualId, setEjercicioActualId] = useState<string | null>(null);
   const ejercicioActual = useMemo(() => ejercicios.find(e => e.id === ejercicioActualId) || null, [ejercicios, ejercicioActualId]);
   const [exNombre, setExNombre] = useState("");
-  const [exCategoria, setExCategoria] = useState<string | undefined>(undefined); // ahora representa el músculo seleccionado
+  const [exCategoria, setExCategoria] = useState<string | undefined>(undefined); 
   const [exDescripcion, setExDescripcion] = useState("");
-const [exImagenUrl, setExImagenUrl] = useState<string>("");
+  const [exImagenUrl, setExImagenUrl] = useState<string>("");
+  
+  // Filters
   const ejerciciosFiltrados = filteredEjercicios;
   const [tab, setTab] = useState<'ejercicios' | 'rutinas'>('ejercicios');
   const [musculoFiltro, setMusculoFiltro] = useState<'all' | string>('all');
@@ -102,278 +103,208 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
       return (e.musculos || []).includes(musculoFiltro);
     });
   }, [ejerciciosFiltrados, musculoFiltro]);
+
+  // States - Rutinas Editor
   const [rutinaNombre, setRutinaNombre] = useState("");
   const [rutinaNotas, setRutinaNotas] = useState("");
-  const [rutinaClienteId, setRutinaClienteId] = useState<string>("");
+  const [rutinaClienteId, setRutinaClienteId] = useState<string>("none");
   const [rutinaDias, setRutinaDias] = useState<string[]>([]);
   const [diasPreset, setDiasPreset] = useState<'3' | '5' | 'libre' | ''>('');
   const [rutinaDetalle, setRutinaDetalle] = useState<Array<{ ejercicio_id: string; orden: number; series?: number; repeticiones?: string; tempo?: string; descanso?: string; notas?: string; dia?: string | null }>>([]);
   const [editingRutinaId, setEditingRutinaId] = useState<string | null>(null);
+  
+  // States - Rutina View/Export
   const [verRutinaAbierto, setVerRutinaAbierto] = useState(false);
   const [verRutinaLoading, setVerRutinaLoading] = useState(false);
   const [rutinaVista, setRutinaVista] = useState<any>(null);
   const rutinaExportRef = useRef<HTMLDivElement | null>(null);
+  const [exporting, setExporting] = useState(false);
+  
+  // States - Actions
   const [rutinaAsignaciones, setRutinaAsignaciones] = useState<Record<string, string>>({});
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [rutinaToDelete, setRutinaToDelete] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  
+  // State - Duplicate
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [targetDuplicateClient, setTargetDuplicateClient] = useState<string>("none");
+  const [rutinaToDuplicate, setRutinaToDuplicate] = useState<string | null>(null);
+
   const imageSizeClass = exporting ? 'h-20 w-20' : 'h-12 w-12';
 
-  // Función para generar PDF con saltos de página entre días e imágenes
-  const generarPDFConSaltos = async () => {
+  // --- Handlers Ejercicios ---
+  const abrirNuevoEjercicio = () => {
+    setEjercicioActualId(null);
+    setExNombre(""); setExCategoria(undefined);
+    setExDescripcion(""); setExImagenUrl("");
+    setDialogoAbierto(true);
+  };
+  
+  const abrirEditarEjercicio = (id: string) => {
+    setEjercicioActualId(id);
+    const ej = ejercicios.find(e => e.id === id);
+    setExNombre(ej?.nombre || "");
+    setExCategoria((ej?.musculos && ej.musculos[0]) || undefined);
+    setExDescripcion(ej?.descripcion || "");
+    setExImagenUrl(ej?.imagen_url || "");
+    setDialogoAbierto(true);
+  };
+
+  const guardarEjercicio = async () => {
+    if (!exNombre.trim()) { toast({ variant:'destructive', title:'Nombre requerido', description:'Ingresa el nombre del ejercicio' }); return; }
     try {
-      setExporting(true);
-      
-      // Crear PDF con saltos de página entre días
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - margin * 2;
-      
-      let yPosition = margin;
-      
-      // Título de la rutina
-      pdf.setFontSize(20);
-      pdf.setFont(undefined, 'bold');
-      pdf.text(rutinaVista?.rutina?.nombre || 'Rutina de Ejercicios', margin, yPosition);
-      yPosition += 10;
-      
-      // Días de la rutina
-      if (rutinaVista?.rutina?.dias && rutinaVista.rutina.dias.length > 0) {
-        pdf.setFontSize(12);
-        pdf.setFont(undefined, 'normal');
-        pdf.text(`Días: ${rutinaVista.rutina.dias.join(', ')}`, margin, yPosition);
-        yPosition += 10;
-      }
-      
-      // Notas si existen
-      if (rutinaVista?.rutina?.notas) {
-        pdf.setFontSize(11);
-        pdf.text('Notas:', margin, yPosition);
-        yPosition += 5;
-        
-        // Dividir notas en líneas si son largas
-        const notasLines = pdf.splitTextToSize(rutinaVista.rutina.notas, contentWidth);
-        pdf.text(notasLines, margin, yPosition);
-        yPosition += notasLines.length * 5 + 5;
-      }
-      
-      // Procesar ejercicios por días
-      const detalle = (rutinaVista?.detalle || []) as any[];
-      const tieneDia = detalle.some(d => d.dia);
-      
-      // Función auxiliar para cargar imágenes
-      const cargarImagen = (url: string): Promise<string> => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = 80;
-            canvas.height = 60;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              // Establecer fondo blanco
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              // Dibujar la imagen encima del fondo blanco
-              ctx.drawImage(img, 0, 0, 80, 60);
-              resolve(canvas.toDataURL('image/jpeg', 0.8));
-            } else {
-              resolve('');
-            }
-          };
-          img.onerror = () => resolve('');
-          img.src = url;
-        });
-      };
-      
-      if (tieneDia) {
-        // Agrupar por días
-        const grupos: Record<string, any[]> = {};
-        for (const it of detalle) {
-          const key = String(it.dia || '1');
-          if (!grupos[key]) grupos[key] = [];
-          grupos[key].push(it);
-        }
-        
-        const diasOrdenados = Object.keys(grupos).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-        
-        for (let diaIndex = 0; diaIndex < diasOrdenados.length; diaIndex++) {
-          const diaKey = diasOrdenados[diaIndex];
-          
-          // Salto de página para cada día (excepto el primero)
-          if (diaIndex > 0) {
-            pdf.addPage();
-            yPosition = margin;
-          }
-          
-          // Título del día
-          pdf.setFontSize(16);
-          pdf.setFont(undefined, 'bold');
-          pdf.text(`Día ${diaKey}`, margin, yPosition);
-          yPosition += 15;
-          
-          // Ejercicios del día
-          const ejerciciosDia = grupos[diaKey];
-          
-          for (let ejIndex = 0; ejIndex < ejerciciosDia.length; ejIndex++) {
-            const item = ejerciciosDia[ejIndex];
-            const ejercicio = item.ejercicios;
-            if (!ejercicio) continue;
-            
-            // Calcular espacio necesario para este ejercicio
-            let espacioNecesario = 30; // Espacio base para imagen + detalles básicos
-            if (ejercicio.descripcion) {
-              const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
-              espacioNecesario += descLines.length * 4 + 5;
-            }
-            
-            // Verificar si necesitamos nueva página
-            if (yPosition + espacioNecesario > pageHeight - 20) {
-              pdf.addPage();
-              yPosition = margin;
-            }
-            
-            // Cargar y agregar imagen si existe
-            if (ejercicio.imagen_url) {
-              try {
-                const imgData = await cargarImagen(ejercicio.imagen_url);
-                if (imgData) {
-                  pdf.addImage(imgData, 'JPEG', margin, yPosition, 25, 20);
-                }
-              } catch (error) {
-                console.warn('Error al cargar imagen:', error);
-              }
-            }
-            
-            // Nombre del ejercicio (a la derecha de la imagen)
-            pdf.setFontSize(14);
-            pdf.setFont(undefined, 'bold');
-            pdf.text(`${ejIndex + 1}. ${ejercicio.nombre}`, margin + 30, yPosition + 7);
-            
-            // Detalles del ejercicio
-            pdf.setFontSize(11);
-            pdf.setFont(undefined, 'normal');
-            
-            const detalles = [];
-            if (item.series) detalles.push(`Series: ${item.series}`);
-            if (item.repeticiones) detalles.push(`Reps: ${item.repeticiones}`);
-            if (item.tempo) detalles.push(`Tempo: ${item.tempo}`);
-            if (item.descanso) detalles.push(`Descanso: ${item.descanso}`);
-            
-            if (detalles.length > 0) {
-              pdf.text(detalles.join(' | '), margin + 30, yPosition + 15);
-              yPosition += 25;
-            } else {
-              yPosition += 20;
-            }
-            
-            // Descripción si existe
-            if (ejercicio.descripcion) {
-              const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
-              pdf.text(descLines, margin + 30, yPosition);
-              yPosition += descLines.length * 4 + 5;
-            } else {
-              yPosition += 5;
-            }
-            
-            // Línea separadora (solo si no es el último ejercicio)
-            if (ejIndex < ejerciciosDia.length - 1) {
-              pdf.setDrawColor(200, 200, 200);
-              pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-              yPosition += 8;
-            }
-          }
-          
-          // Optimizar espacio al final del día - si hay mucho espacio y es el último día, no agregar página extra
-          if (diaIndex < diasOrdenados.length - 1 && yPosition > pageHeight - 150) {
-            // Dejar espacio natural para el siguiente día
-          }
-        }
+      if (!ejercicioActual) {
+        await createEjercicio({ nombre: exNombre, categoria: null, musculos: exCategoria ? [exCategoria] : [], descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
       } else {
-        // Sin días, mostrar todos los ejercicios
-        for (let index = 0; index < detalle.length; index++) {
-          const item = detalle[index];
-          const ejercicio = item.ejercicios;
-          if (!ejercicio) continue;
-          
-          // Calcular espacio necesario para este ejercicio
-          let espacioNecesario = 30; // Espacio base para imagen + detalles básicos
-          if (ejercicio.descripcion) {
-            const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
-            espacioNecesario += descLines.length * 4 + 5;
-          }
-          
-          // Verificar si necesitamos nueva página
-          if (yPosition + espacioNecesario > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = margin;
-          }
-          
-          // Cargar y agregar imagen si existe
-          if (ejercicio.imagen_url) {
-            try {
-              const imgData = await cargarImagen(ejercicio.imagen_url);
-              if (imgData) {
-                pdf.addImage(imgData, 'JPEG', margin, yPosition, 25, 20);
-              }
-            } catch (error) {
-              console.warn('Error al cargar imagen:', error);
-            }
-          }
-          
-          // Nombre del ejercicio
-          pdf.setFontSize(14);
-          pdf.setFont(undefined, 'bold');
-          pdf.text(`${index + 1}. ${ejercicio.nombre}`, margin + 30, yPosition + 7);
-          
-          // Detalles del ejercicio
-          pdf.setFontSize(11);
-          pdf.setFont(undefined, 'normal');
-          
-          const detalles = [];
-          if (item.series) detalles.push(`Series: ${item.series}`);
-          if (item.repeticiones) detalles.push(`Reps: ${item.repeticiones}`);
-          if (item.tempo) detalles.push(`Tempo: ${item.tempo}`);
-          if (item.descanso) detalles.push(`Descanso: ${item.descanso}`);
-          
-          if (detalles.length > 0) {
-            pdf.text(detalles.join(' | '), margin + 30, yPosition + 15);
-            yPosition += 25;
-          } else {
-            yPosition += 20;
-          }
-          
-          // Descripción si existe
-          if (ejercicio.descripcion) {
-            const descLines = pdf.splitTextToSize(ejercicio.descripcion, contentWidth - 30);
-            pdf.text(descLines, margin + 30, yPosition);
-            yPosition += descLines.length * 4 + 5;
-          } else {
-            yPosition += 5;
-          }
-          
-          // Línea separadora (solo si no es el último ejercicio)
-          if (index < detalle.length - 1) {
-            pdf.setDrawColor(200, 200, 200);
-            pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-            yPosition += 8;
-          }
-        }
+        await updateEjercicio(ejercicioActual.id, { nombre: exNombre, categoria: null, musculos: exCategoria ? [exCategoria] : [], descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
       }
+      setDialogoAbierto(false);
+      setEjercicioActualId(null);
+      toast({ title: 'Ejercicio guardado', description: 'El ejercicio se guardó correctamente.' });
+    } catch {}
+  };
+
+  // --- Handlers Rutinas ---
+
+  const handleDiasPresetChange = (v: string) => {
+      setDiasPreset(v as any);
+      if (v === '3') {
+          setRutinaDias(['Lunes', 'Miércoles', 'Viernes']);
+      } else if (v === '5') {
+          setRutinaDias(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']);
+      } else if (v === 'libre') {
+          setRutinaDias([]);
+      }
+  };
+
+  const handleSaveRutina = async () => {
+      if (!rutinaNombre.trim()) { toast({ variant:'destructive', title:'Datos incompletos', description:'El nombre de la rutina es requerido.' }); return; }
       
-      const nombre = (rutinaVista?.rutina?.nombre || 'rutina').replace(/\s+/g, '_');
-      const fecha = new Date().toISOString().slice(0, 10);
-      pdf.save(`${nombre}_${fecha}.pdf`);
+      const clienteFinal = rutinaClienteId === "none" ? null : rutinaClienteId;
       
-    } catch (err) {
-      console.error('Error exportando PDF', err);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar la rutina a PDF.' });
-    } finally {
-      setExporting(false);
-    }
+      // Mapear dias índice a nombres si es necesario (para preset 3 o 5 días, los selects devuelven "1", "2")
+      // Sin embargo, si usamos el preset, rutinaDias ya tiene ["Lunes", ...]
+      // El problema es rutinaDetalle[].dia. Si es preset, la UI usa indices 1, 2, 3.
+      // Debemos mapear esos indices a los nombres reales en rutinaDias.
+      
+      const detalleFinal = rutinaDetalle.map(d => {
+          if (!d.ejercicio_id) return null;
+          let diaNombre = d.dia;
+          if ((diasPreset === '3' || diasPreset === '5') && d.dia && !isNaN(parseInt(d.dia))) {
+              // d.dia trae "1", "2", etc.
+              const idx = parseInt(d.dia) - 1;
+              if (rutinaDias[idx]) {
+                  diaNombre = rutinaDias[idx];
+              }
+          }
+          return {
+              ...d,
+              dia: diaNombre
+          };
+      }).filter(d => d !== null) as any[];
+
+      try {
+        if (editingRutinaId) {
+          await updateRutinaCompleta(
+            editingRutinaId,
+            { nombre: rutinaNombre, cliente_id: clienteFinal, notas: rutinaNotas, dias: rutinaDias },
+            detalleFinal
+          );
+          toast({ title:'Rutina actualizada', description:'La rutina se actualizó correctamente.' });
+        } else {
+          await createRutina({ nombre: rutinaNombre, cliente_id: clienteFinal, notas: rutinaNotas, dias: rutinaDias }, detalleFinal);
+          toast({ title:'Rutina creada', description:'La rutina se guardó correctamente.' });
+        }
+        // Reset
+        setRutinaNombre(''); setRutinaNotas(''); setRutinaClienteId('none'); setRutinaDias([]); setRutinaDetalle([]); setEditingRutinaId(null); setDiasPreset('');
+        fetchRutinas();
+      } catch {}
+  };
+
+  const handleEditRutina = async (rId: string) => {
+      try {
+          const res = await getRutinaDetalle(rId);
+          setEditingRutinaId(rId);
+          setTab('rutinas');
+          setRutinaNombre(res.rutina.nombre || '');
+          setRutinaNotas(res.rutina.notas || '');
+          setRutinaClienteId(res.rutina.cliente_id || 'none');
+          setRutinaDias(res.rutina.dias || []);
+          
+          let preset = 'libre';
+          if (Array.isArray(res.rutina.dias)) {
+            const d = res.rutina.dias;
+            if (d.join(',') === ['Lunes','Miércoles','Viernes'].join(',')) preset = '3';
+            else if (d.join(',') === ['Lunes','Martes','Miércoles','Jueves','Viernes'].join(',')) preset = '5';
+          }
+          setDiasPreset(preset as any);
+
+          // Si es preset, la UI espera indices "1", "2" en d.dia, pero la BD tiene nombres "Lunes"
+          // Mapear inverse: "Lunes" -> "1"
+          const mappedDetalle = (res.detalle || []).map((it: any, idx: number) => {
+              let diaVal = it.dia;
+              if (preset === '3' || preset === '5') {
+                  const diaIdx = res.rutina.dias?.indexOf(it.dia || '');
+                  if (diaIdx !== undefined && diaIdx !== -1) {
+                      diaVal = (diaIdx + 1).toString();
+                  }
+              }
+              return {
+                  ejercicio_id: it.ejercicio_id,
+                  orden: it.orden ?? (idx + 1),
+                  series: it.series ?? undefined,
+                  repeticiones: it.repeticiones ?? undefined,
+                  tempo: it.tempo ?? undefined,
+                  descanso: it.descanso ?? undefined,
+                  notas: it.notas ?? undefined,
+                  dia: diaVal,
+              };
+          });
+
+          setRutinaDetalle(mappedDetalle as any);
+          toast({ title: 'Edición de rutina', description: 'Cargada para edición.' });
+        } catch (e) {
+            console.error(e);
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar la rutina para editar.' });
+        }
+  };
+
+  const handleDuplicateRutina = async () => {
+      if (!rutinaToDuplicate) return;
+      try {
+          const res = await getRutinaDetalle(rutinaToDuplicate);
+          const newName = `${res.rutina.nombre} (Copia)`;
+          const targetClient = targetDuplicateClient === 'none' ? null : targetDuplicateClient;
+          
+          // Clonar
+          await createRutina(
+              {
+                  nombre: newName,
+                  cliente_id: targetClient,
+                  dias: res.rutina.dias,
+                  notas: res.rutina.notas
+              },
+              (res.detalle || []).map((d: any) => ({
+                  rutina_id: '', // será ignorado/generado
+                  ejercicio_id: d.ejercicio_id,
+                  orden: d.orden,
+                  series: d.series,
+                  repeticiones: d.repeticiones, 
+                  tempo: d.tempo,
+                  descanso: d.descanso,
+                  notas: d.notas,
+                  dia: d.dia
+              }))
+          );
+          
+          toast({ title: 'Rutina duplicada', description: `Se creó una copia asignada correctamente.` });
+          setDuplicateDialogOpen(false);
+          setRutinaToDuplicate(null);
+          setTargetDuplicateClient('none');
+          fetchRutinas();
+      } catch (err) {
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo duplicar la rutina.' });
+      }
   };
 
   const waitImagesLoaded = async (node?: HTMLDivElement | null) => {
@@ -392,35 +323,6 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
         });
       })
     );
-  };
-  
-  const abrirNuevoEjercicio = () => {
-    setEjercicioActualId(null);
-    setExNombre(""); setExCategoria(undefined);
-    setExDescripcion(""); setExImagenUrl("");
-    setDialogoAbierto(true);
-  };
-  const abrirEditarEjercicio = (id: string) => {
-    setEjercicioActualId(id);
-    const ej = ejercicios.find(e => e.id === id);
-    setExNombre(ej?.nombre || "");
-    setExCategoria((ej?.musculos && ej.musculos[0]) || undefined);
-    setExDescripcion(ej?.descripcion || "");
-    setExImagenUrl(ej?.imagen_url || "");
-    setDialogoAbierto(true);
-  };
-  const guardarEjercicio = async () => {
-    if (!exNombre.trim()) { toast({ variant:'destructive', title:'Nombre requerido', description:'Ingresa el nombre del ejercicio' }); return; }
-    try {
-      if (!ejercicioActual) {
-        await createEjercicio({ nombre: exNombre, categoria: null, musculos: exCategoria ? [exCategoria] : [], descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
-      } else {
-        await updateEjercicio(ejercicioActual.id, { nombre: exNombre, categoria: null, musculos: exCategoria ? [exCategoria] : [], descripcion: exDescripcion || null, imagen_url: exImagenUrl || undefined });
-      }
-      setDialogoAbierto(false);
-      setEjercicioActualId(null);
-      toast({ title: 'Ejercicio guardado', description: 'El ejercicio se guardó correctamente.' });
-    } catch {}
   };
   
   return (
@@ -617,7 +519,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Crear Rutina</CardTitle>
+              <CardTitle>{editingRutinaId ? "Editar Rutina" : "Crear Rutina"}</CardTitle>
               <CardDescription>Define la rutina y asigna ejercicios al cliente</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
@@ -626,27 +528,29 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                   <Label htmlFor="rutina-nombre">Nombre</Label>
                   <Input id="rutina-nombre" className="h-9 text-sm" value={rutinaNombre} onChange={(e) => setRutinaNombre(e.target.value)} placeholder="Ej. Rutina fuerza superior" />
                 </div>
+                
                 <div className="grid gap-2">
-                  <Label>Días</Label>
+                    <Label htmlFor="rutina-cliente">Asignar a Cliente</Label>
+                    <ClientCombobox
+                        value={rutinaClienteId}
+                        options={clientes}
+                        onChange={setRutinaClienteId}
+                        placeholder="Seleccionar Cliente (Opcional)"
+                    />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Plan de Días</Label>
                   <Select
                     value={diasPreset}
-                    onValueChange={(v) => {
-                      setDiasPreset(v as '3' | '5' | 'libre');
-                      if (v === '3') {
-                        setRutinaDias(['Lunes', 'Miércoles', 'Viernes']);
-                      } else if (v === '5') {
-                        setRutinaDias(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']);
-                      } else if (v === 'libre') {
-                        setRutinaDias([]);
-                      }
-                    }}
+                    onValueChange={handleDiasPresetChange}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="Selecciona 3 días, 5 días o Libre" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="3">3 días</SelectItem>
-                      <SelectItem value="5">5 días</SelectItem>
+                      <SelectItem value="3">3 días (L-X-V)</SelectItem>
+                      <SelectItem value="5">5 días (L-M-X-J-V)</SelectItem>
                       <SelectItem value="libre">Libre</SelectItem>
                     </SelectContent>
                   </Select>
@@ -673,13 +577,17 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                   {diasPreset === '3' || diasPreset === '5' ? (
                     <div className="space-y-4">
                       {Array.from({ length: diasPreset === '3' ? 3 : 5 }, (_, i) => `${i+1}`).map((dia) => (
-                        <div key={dia} className="space-y-2">
-                          <div className="font-semibold">Día {dia}</div>
+                        <div key={dia} className="space-y-2 border rounded-md p-3 bg-muted/20">
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                              {/* Display actual day name if available */}
+                              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                  {rutinaDias[parseInt(dia)-1] || `Día ${dia}`}
+                              </span>
+                          </div>
                           {(rutinaDetalle.filter(d => (d.dia || '1') === dia)).map((item, _idx) => {
-                            const ej = ejercicios.find(e => e.id === item.ejercicio_id);
                             const idx = rutinaDetalle.findIndex(d => d === item);
                             return (
-                              <div key={`dia-${dia}-idx-${idx}`} className="grid md:grid-cols-6 gap-2 items-end">
+                              <div key={`dia-${dia}-idx-${idx}`} className="grid md:grid-cols-6 gap-2 items-end bg-card p-2 rounded border">
                                 <div className="md:col-span-2">
                                   <ExerciseCombobox
                                     value={item.ejercicio_id}
@@ -693,7 +601,6 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                     }}
                                   />
                                 </div>
-                            {/* Campo Orden eliminado por simplicidad */}
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
                               setRutinaDetalle(prev => {
@@ -718,7 +625,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                 return next;
                               });
                               }}>
-                                <SelectTrigger>
+                                <SelectTrigger className="h-9 text-sm">
                                   <SelectValue placeholder="Día" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -739,8 +646,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                               </div>
                             );
                           })}
-                          <Button variant="outline" className="gap-2" onClick={() => setRutinaDetalle([...rutinaDetalle, { ejercicio_id: '', orden: rutinaDetalle.length+1, dia }])}>
-                            <Plus className="h-4 w-4" /> Añadir ejercicio al Día {dia}
+                          <Button variant="ghost" size="sm" className="gap-2 text-xs" onClick={() => setRutinaDetalle([...rutinaDetalle, { ejercicio_id: '', orden: rutinaDetalle.length+1, dia }])}>
+                            <Plus className="h-3 w-3" /> Añadir ejercicio
                           </Button>
                         </div>
                       ))}
@@ -748,7 +655,6 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                   ) : (
                     <>
                       {rutinaDetalle.map((item, idx) => {
-                        const ej = ejercicios.find(e => e.id === item.ejercicio_id);
                         return (
                           <div key={idx} className="grid md:grid-cols-6 gap-2 items-end">
                             <div className="md:col-span-2">
@@ -764,7 +670,6 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                 }}
                               />
                             </div>
-                            {/* Campo Orden eliminado por simplicidad */}
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
                               setRutinaDetalle(prev => {
@@ -811,25 +716,8 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
               </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setRutinaNombre(''); setRutinaNotas(''); setRutinaClienteId(''); setRutinaDias([]); setRutinaDetalle([]); }}>Limpiar</Button>
-              <Button onClick={async () => {
-                if (!rutinaNombre.trim()) { toast({ variant:'destructive', title:'Datos incompletos', description:'El nombre de la rutina es requerido.' }); return; }
-                try {
-                  if (editingRutinaId) {
-                    await updateRutinaCompleta(
-                      editingRutinaId,
-                      { nombre: rutinaNombre, cliente_id: rutinaClienteId || null, notas: rutinaNotas, dias: rutinaDias },
-                      rutinaDetalle.filter(d => d.ejercicio_id)
-                    );
-                    toast({ title:'Rutina actualizada', description:'La rutina se actualizó correctamente.' });
-                  } else {
-                    await createRutina({ nombre: rutinaNombre, cliente_id: rutinaClienteId || null, notas: rutinaNotas, dias: rutinaDias }, rutinaDetalle.filter(d => d.ejercicio_id));
-                    toast({ title:'Rutina creada', description:'La rutina se guardó correctamente.' });
-                  }
-                  setRutinaNombre(''); setRutinaNotas(''); setRutinaClienteId(''); setRutinaDias([]); setRutinaDetalle([]); setEditingRutinaId(null);
-                  fetchRutinas(rutinaClienteId || undefined);
-                } catch {}
-              }}>Guardar Rutina</Button>
+              <Button variant="outline" onClick={() => { setRutinaNombre(''); setRutinaNotas(''); setRutinaClienteId('none'); setRutinaDias([]); setRutinaDetalle([]); setEditingRutinaId(null); setDiasPreset('libre'); }}>Limpiar</Button>
+              <Button onClick={handleSaveRutina}>{editingRutinaId ? "Actualizar Rutina" : "Guardar Rutina"}</Button>
             </CardFooter>
           </Card>
 
@@ -843,109 +731,71 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                 {rutinas.length === 0 && (
                   <div className="col-span-full flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
                     <Zap className="h-8 w-8 mb-2" />
-                    <p>No hay rutinas para el cliente seleccionado.</p>
-                    <p className="text-xs">Selecciona un cliente o crea una nueva rutina.</p>
+                    <p>No hay rutinas registradas.</p>
                   </div>
                 )}
                 {rutinas.map((r) => (
                   <Card key={r.id} className="border">
-                    <CardHeader>
-                      <CardTitle>{r.nombre}</CardTitle>
-                      <CardDescription>{(r.dias || []).join(', ')}</CardDescription>
-                    </CardHeader>
-                    <CardFooter className="flex flex-col md:flex-row md:justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={rutinaAsignaciones[r.id] ?? (r.cliente_id || 'none')}
-                          onValueChange={(v) => setRutinaAsignaciones(prev => ({ ...prev, [r.id]: v }))}
-                        >
-                          <SelectTrigger className="w-[220px]">
-                            <SelectValue placeholder="Asignar cliente" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin cliente</SelectItem>
-                            {clientes.map((c: ClienteRow) => (
-                              <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            const selected = rutinaAsignaciones[r.id] ?? 'none';
-                            try {
-                              await updateRutina(r.id, { cliente_id: selected === 'none' ? null : selected });
-                              toast({ title: 'Rutina asignada', description: 'La rutina fue asignada correctamente.' });
-                              fetchRutinas(rutinaClienteId || undefined);
-                            } catch {}
-                          }}
-                        >
-                          Asignar
-                        </Button>
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between">
+                         <CardTitle className="text-lg">{r.nombre}</CardTitle>
+                         {r.cliente_id && (
+                             <Badge variant="secondary" className="gap-1">
+                                 <Users className="h-3 w-3" />
+                                 {clientes.find(c => c.id === r.cliente_id)?.nombre || 'Cliente elim.'}
+                             </Badge>
+                         )}
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              const res = await getRutinaDetalle(r.id);
-                              setEditingRutinaId(r.id);
-                              setTab('rutinas');
-                              setRutinaNombre(res.rutina.nombre || '');
-                              setRutinaNotas(res.rutina.notas || '');
-                              setRutinaClienteId(res.rutina.cliente_id || '');
-                              setRutinaDias(res.rutina.dias || []);
-                              if (Array.isArray(res.rutina.dias)) {
-                                const d = res.rutina.dias;
-                                if (d.join(',') === ['Lunes','Miércoles','Viernes'].join(',')) setDiasPreset('3');
-                                else if (d.join(',') === ['Lunes','Martes','Miércoles','Jueves','Viernes'].join(',')) setDiasPreset('5');
-                                else setDiasPreset('libre');
-                              } else setDiasPreset('libre');
-                              setRutinaDetalle(
-                                (res.detalle || []).map((it: any, idx: number) => ({
-                                  ejercicio_id: it.ejercicio_id,
-                                  orden: it.orden ?? (idx + 1),
-                                  series: it.series ?? undefined,
-                                  repeticiones: it.repeticiones ?? undefined,
-                                  tempo: it.tempo ?? undefined,
-                                  descanso: it.descanso ?? undefined,
-                                  notas: it.notas ?? undefined,
-                                  dia: it.dia ?? undefined,
-                                })) as any
-                              );
-                              toast({ title: 'Edición de rutina', description: 'Cargada para edición.' });
-                            } catch {
-                              toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar la rutina para editar.' });
-                            }
-                          }}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            setVerRutinaAbierto(true);
-                            setVerRutinaLoading(true);
-                            try {
-                              const res = await getRutinaDetalle(r.id);
-                              setRutinaVista(res);
-                            } catch (err) {
-                              toast({ variant: "destructive", title: "Error", description: "No se pudo cargar el detalle de la rutina" });
-                            } finally {
-                              setVerRutinaLoading(false);
-                            }
-                          }}
-                        >
-                          Ver
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          onClick={() => { setRutinaToDelete(r.id); setConfirmDeleteOpen(true); }}
-                          aria-label="Eliminar rutina"
-                          title="Eliminar rutina"
-                        >
-                          Eliminar
-                        </Button>
+                      <CardDescription className="line-clamp-1">{(r.dias || []).join(', ')}</CardDescription>
+                    </CardHeader>
+                    <CardFooter className="flex flex-col gap-2 pt-0">
+                      <div className="flex gap-2 w-full justify-between items-center">
+                        <div className="flex gap-1">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleEditRutina(r.id)}
+                            >
+                                <Edit className="h-3 w-3 mr-1" /> Editar
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setRutinaToDuplicate(r.id);
+                                    setDuplicateDialogOpen(true);
+                                }}
+                            >
+                                <Copy className="h-3 w-3 mr-1" /> Duplicar
+                            </Button>
+                        </div>
+                        <div className="flex gap-1">
+                            <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={async () => {
+                                setVerRutinaAbierto(true);
+                                setVerRutinaLoading(true);
+                                try {
+                                const res = await getRutinaDetalle(r.id);
+                                setRutinaVista(res);
+                                } catch (err) {
+                                toast({ variant: "destructive", title: "Error", description: "No se pudo cargar el detalle de la rutina" });
+                                } finally {
+                                setVerRutinaLoading(false);
+                                }
+                            }}
+                            >
+                            Ver
+                            </Button>
+                            <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => { setRutinaToDelete(r.id); setConfirmDeleteOpen(true); }}
+                            >
+                            <Trash2 className="h-3 w-3" />
+                            </Button>
+                        </div>
                       </div>
                     </CardFooter>
                   </Card>
@@ -953,6 +803,30 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
               </div>
             </CardContent>
           </Card>
+
+          <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+              <DialogContent>
+                  <DialogHeader>
+                      <DialogTitle>Duplicar Rutina</DialogTitle>
+                      <DialogDescription>
+                          Se creará una copia exacta de la rutina. Puedes asignarla a un nuevo cliente inmediatamente.
+                      </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-2 space-y-2">
+                       <Label>Asignar copia a:</Label>
+                       <ClientCombobox
+                            value={targetDuplicateClient}
+                            options={clientes}
+                            onChange={setTargetDuplicateClient}
+                            placeholder="Seleccionar Cliente"
+                        />
+                  </div>
+                  <DialogFooter>
+                      <Button variant="outline" onClick={() => setDuplicateDialogOpen(false)}>Cancelar</Button>
+                      <Button onClick={handleDuplicateRutina}>Duplicar</Button>
+                  </DialogFooter>
+              </DialogContent>
+          </Dialog>
 
           <Dialog open={verRutinaAbierto} onOpenChange={setVerRutinaAbierto}>
             <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col">
@@ -979,7 +853,9 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                     <Label>Ejercicios</Label>
                     {(() => {
                       const detalle = (rutinaVista?.detalle || []) as any[];
+                      // Check real day string if possible
                       const tieneDia = detalle.some(d => d.dia);
+                      
                       if (!tieneDia) {
                         return (
                           <div className="space-y-3 mt-2">
@@ -1009,27 +885,34 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                   <Label className="text-xs">Reps</Label>
                                   <div>{item.repeticiones ?? '-'}</div>
                                 </div>
-                                {/* Campos Tempo y Descanso ocultos en la vista */}
                               </div>
                             ))}
                           </div>
                         );
                       }
+                      
+                      // Agrupar visualmente por dia
                       const grupos: Record<string, any[]> = {};
                       for (const it of detalle) {
-                        const key = String(it.dia || '1');
+                         // Fallback para agrupar
+                        const key = String(it.dia || 'General');
                         if (!grupos[key]) grupos[key] = [];
                         grupos[key].push(it);
                       }
-                      const diasOrdenados = Object.keys(grupos).sort((a,b) => parseInt(a,10)-parseInt(b,10));
+                      
+                       // Sort days: try simple sort, usually Lunes/Martes...
+                      // Si son string como Lunes, Martes, el sort alfabético no es ideal, pero funcional por ahora
+                      // Mejor sería un mapeo, pero como es vista de admin, aceptable.
+                      const diasOrdenados = Object.keys(grupos).sort(); 
+                      
                       return (
                         <div className="space-y-4 mt-2">
                           {diasOrdenados.map((diaKey) => (
                             <div key={diaKey} className="space-y-2">
-                              <div className="font-semibold">Día {diaKey}</div>
-                              <div className="space-y-3">
+                              <div className="font-semibold bg-muted/30 p-2 rounded">{diaKey}</div>
+                              <div className="space-y-3 pl-2">
                                 {grupos[diaKey].map((item: any, idx: number) => (
-                                  <div key={`v-${diaKey}-${idx}`} className="grid md:grid-cols-4 gap-2 items-center">
+                                  <div key={`v-${diaKey}-${idx}`} className="grid md:grid-cols-4 gap-2 items-center border-b pb-2 last:border-0">
                                     <div className="md:col-span-2 flex items-center gap-2">
                                       {item.ejercicios?.imagen_url && (
                                         <img
@@ -1043,18 +926,18 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                                       )}
                                       <div>
                                         <div className="font-medium">{item.ejercicios?.nombre || "Ejercicio"}</div>
-                                        <div className="text-xs text-muted-foreground">Orden: {item.orden}</div>
                                       </div>
                                     </div>
-                                    <div>
-                                      <Label className="text-xs">Series</Label>
-                                      <div>{item.series ?? '-'}</div>
+                                    <div className="flex gap-4">
+                                        <div>
+                                            <span className="text-xs text-muted-foreground">Series: </span>
+                                            <span className="text-sm font-medium">{item.series ?? '-'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-muted-foreground">Reps: </span>
+                                            <span className="text-sm font-medium">{item.repeticiones ?? '-'}</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                      <Label className="text-xs">Reps</Label>
-                                      <div>{item.repeticiones ?? '-'}</div>
-                                    </div>
-                                    {/* Campos Tempo y Descanso ocultos en la vista */}
                                   </div>
                                 ))}
                               </div>
@@ -1097,7 +980,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                     Descargar JPG
                   </Button>
                   <Button
-                    onClick={generarPDFConSaltos}
+                    onClick={() => generateRoutinePDF(rutinaVista, toast)}
                   >
                     Descargar PDF
                   </Button>
@@ -1122,7 +1005,7 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
                     try {
                       await deleteRutina(rutinaToDelete);
                       toast({ title: 'Rutina eliminada', description: 'La rutina fue eliminada correctamente.' });
-                      fetchRutinas(rutinaClienteId || undefined);
+                      fetchRutinas();
                     } catch {}
                     finally {
                       setConfirmDeleteOpen(false);
@@ -1138,51 +1021,5 @@ const [exImagenUrl, setExImagenUrl] = useState<string>("");
         </div>
       )}
     </div>
-  );
-}
-
-function ExerciseCombobox({
-  value,
-  options,
-  onChange,
-}: {
-  value: string | null | undefined;
-  options: EjercicioRow[];
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find(o => o.id === value);
-  const label = selected?.nombre || "Seleccionar ejercicio";
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="justify-between w-full">
-          {label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0" sideOffset={4}>
-        <Command>
-          <CommandInput placeholder="Buscar ejercicio..." />
-          <CommandEmpty>Sin resultados</CommandEmpty>
-          <CommandList>
-            <CommandGroup>
-              {options.map((e) => (
-                <CommandItem
-                  key={e.id}
-                  value={e.nombre}
-                  onSelect={() => {
-                    onChange(e.id);
-                    setOpen(false);
-                  }}
-                >
-                  {e.nombre}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }

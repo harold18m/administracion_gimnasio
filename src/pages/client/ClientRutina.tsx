@@ -71,10 +71,17 @@ export default function ClientRutina() {
         
         // Auto-select current day if defined in routine
         const today = new Date().toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
-        if (activeRutina.dias?.includes(today)) {
+        
+        // Normalize routine days to lowercase for comparison
+        const routineDaysLower = (activeRutina.dias || []).map((d: string) => d.toLowerCase());
+        
+        if (routineDaysLower.includes(today)) {
           setActiveTab(today);
         } else if (activeRutina.dias?.length > 0) {
-          setActiveTab(activeRutina.dias[0]);
+          // If today isn't in routine, select the first day
+          // Ensure we use the lowercase version if that's what the tabs use
+          const firstDay = activeRutina.dias[0].toLowerCase();
+          setActiveTab(firstDay);
         }
       }
     } catch (error) {
@@ -108,17 +115,27 @@ export default function ClientRutina() {
     <div className="p-4 space-y-4 max-w-md mx-auto h-[calc(100vh-80px)] flex flex-col">
       <div className="space-y-1 shrink-0">
         <h1 className="text-2xl font-bold">{rutina.nombre}</h1>
-        <p className="text-sm text-muted-foreground flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          Plan de Entrenamiento
-        </p>
+        <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Plan de Entrenamiento
+            </p>
+            {rutina.notas && (
+                <div className="bg-muted/30 p-3 rounded-md text-sm text-muted-foreground border">
+                    <span className="font-semibold block mb-1 text-xs uppercase tracking-wide">Notas del entrenador:</span>
+                    {rutina.notas}
+                </div>
+            )}
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <ScrollArea className="w-full shrink-0">
           <TabsList className="w-full justify-start mb-4 bg-transparent p-0 gap-2">
             {diasOrdenados.map((dia) => {
-              if (rutina.dias?.includes(dia)) { // Only show days that are part of the routine
+              const isInRoutine = (rutina.dias || []).some((d: string) => d.toLowerCase() === dia.toLowerCase());
+              
+              if (isInRoutine) { // Only show days that are part of the routine
                 return (
                   <TabsTrigger 
                     key={dia} 
