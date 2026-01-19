@@ -5,8 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Calendar, Dumbbell, Clock, Repeat } from "lucide-react";
+import { Loader2, Calendar, Dumbbell, Clock, Repeat, Play } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import ActiveWorkoutView from "./components/ActiveWorkoutView";
 
 interface Exercise {
   id: string;
@@ -29,6 +31,7 @@ export default function ClientRutina() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("lunes");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isActiveSession, setIsActiveSession] = useState(false);
 
   const diasOrdenados = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 
@@ -153,7 +156,7 @@ export default function ClientRutina() {
           </TabsList>
         </ScrollArea>
 
-        <div className="flex-1 overflow-y-auto pb-20">
+        <div className="flex-1 overflow-y-auto pb-20 relative">
           {diasOrdenados.map((dia) => (
             <TabsContent key={dia} value={dia} className="mt-0 space-y-4">
               {getExercisesByDay(dia).length === 0 ? (
@@ -161,51 +164,73 @@ export default function ClientRutina() {
                   <p>Descanso o sin ejercicios asignados</p>
                 </div>
               ) : (
-                getExercisesByDay(dia).map((item) => (
-                  <Card key={item.id} className="overflow-hidden">
-                    <div className="flex">
-                      {item.ejercicio.imagen_url && (
-                        <div 
-                          className="w-24 bg-muted shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setSelectedImage(item.ejercicio.imagen_url)}
-                        >
-                           <img 
-                            src={item.ejercicio.imagen_url} 
-                            alt={item.ejercicio.nombre}
-                            className="w-full h-full object-cover"
-                          /> 
-                        </div>
-                      )}
-                      <div className="flex-1 p-3 space-y-1">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-sm leading-tight">{item.ejercicio.nombre}</h3>
-                        </div>
-                        
-                        <div className="flex gap-3 text-xs text-muted-foreground pt-1">
-                          <div className="flex items-center gap-1">
-                            <Repeat className="h-3 w-3" />
-                            <span>{item.series} series</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Dumbbell className="h-3 w-3" />
-                            <span>{item.repeticiones} reps</span>
-                          </div>
-                        </div>
+                <>
+                  <div className="mb-4">
+                     <Button 
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg shadow-md"
+                      onClick={() => setIsActiveSession(true)}
+                     >
+                        <Play className="mr-2 h-5 w-5" fill="currentColor" /> Iniciar Rutina
+                     </Button>
+                  </div>
 
-                        {item.notas && (
-                          <div className="text-xs bg-muted/50 p-1.5 rounded mt-2">
-                            📝 {item.notas}
+                  {getExercisesByDay(dia).map((item) => (
+                    <Card key={item.id} className="overflow-hidden">
+                      <div className="flex">
+                        {item.ejercicio.imagen_url && (
+                          <div 
+                            className="w-24 bg-muted shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setSelectedImage(item.ejercicio.imagen_url)}
+                          >
+                             <img 
+                              src={item.ejercicio.imagen_url} 
+                              alt={item.ejercicio.nombre}
+                              className="w-full h-full object-cover"
+                            /> 
                           </div>
                         )}
+                        <div className="flex-1 p-3 space-y-1">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-bold text-sm leading-tight">{item.ejercicio.nombre}</h3>
+                          </div>
+                          
+                          <div className="flex gap-3 text-xs text-muted-foreground pt-1">
+                            <div className="flex items-center gap-1">
+                              <Repeat className="h-3 w-3" />
+                              <span>{item.series} series</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Dumbbell className="h-3 w-3" />
+                              <span>{item.repeticiones} reps</span>
+                            </div>
+                          </div>
+
+                          {item.notas && (
+                            <div className="text-xs bg-muted/50 p-1.5 rounded mt-2">
+                              📝 {item.notas}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                ))
+                    </Card>
+                  ))}
+                </>
               )}
             </TabsContent>
           ))}
         </div>
       </Tabs>
+
+      {isActiveSession && (
+        <ActiveWorkoutView 
+          exercises={getExercisesByDay(activeTab)}
+          onClose={() => setIsActiveSession(false)}
+          onComplete={() => {
+            setIsActiveSession(false);
+            // Optional: Show completion success message
+          }}
+        />
+      )}
 
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="p-0 overflow-hidden max-w-sm mx-auto rounded-lg">
