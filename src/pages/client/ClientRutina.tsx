@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Calendar, Dumbbell, Clock, Repeat } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface Exercise {
   id: string;
@@ -27,6 +28,7 @@ export default function ClientRutina() {
   const [ejercicios, setEjercicios] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("lunes");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const diasOrdenados = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 
@@ -163,7 +165,10 @@ export default function ClientRutina() {
                   <Card key={item.id} className="overflow-hidden">
                     <div className="flex">
                       {item.ejercicio.imagen_url && (
-                        <div className="w-24 bg-muted shrink-0">
+                        <div 
+                          className="w-24 bg-muted shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setSelectedImage(item.ejercicio.imagen_url)}
+                        >
                            <img 
                             src={item.ejercicio.imagen_url} 
                             alt={item.ejercicio.nombre}
@@ -174,9 +179,6 @@ export default function ClientRutina() {
                       <div className="flex-1 p-3 space-y-1">
                         <div className="flex justify-between items-start">
                           <h3 className="font-bold text-sm leading-tight">{item.ejercicio.nombre}</h3>
-                          <Badge variant="secondary" className="text-[10px] h-5">
-                            #{item.orden}
-                          </Badge>
                         </div>
                         
                         <div className="flex gap-3 text-xs text-muted-foreground pt-1">
@@ -204,6 +206,20 @@ export default function ClientRutina() {
           ))}
         </div>
       </Tabs>
+
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="p-0 overflow-hidden max-w-sm mx-auto rounded-lg">
+          {selectedImage && (
+            <div className="relative aspect-video w-full bg-black flex items-center justify-center">
+              <img 
+                src={selectedImage} 
+                alt="Ejercicio detalle" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
