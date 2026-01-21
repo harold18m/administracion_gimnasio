@@ -233,11 +233,6 @@ export default function ActiveWorkoutView({ exercises, onComplete, onClose }: Ac
                                     <Dumbbell className="h-16 w-16 text-muted-foreground/40" />
                                 </div>
                             )}
-                            <div className="absolute top-2 right-2">
-                                <Badge variant="secondary" className="text-xs font-mono">
-                                    Serie {state.currentSet}/{currentExercise.series}
-                                </Badge>
-                            </div>
                         </div>
 
                         <div className="text-left space-y-1">
@@ -262,7 +257,13 @@ export default function ActiveWorkoutView({ exercises, onComplete, onClose }: Ac
 
       {/* Footer Actions */}
       {!state.isResting && (
-          <div className="p-4 pb-8 border-t bg-background/80 backdrop-blur-sm shrink-0">
+          <div className="p-4 pb-8 border-t bg-background/80 backdrop-blur-sm shrink-0 flex flex-col gap-3">
+            <div className="text-center">
+              <span className="text-sm text-muted-foreground uppercase tracking-widest block mb-1">Serie Actual</span>
+              <div className="text-3xl font-bold tracking-tight">
+                {state.currentSet} <span className="text-muted-foreground text-xl">/ {currentExercise.series}</span>
+              </div>
+            </div>
             <Button size="lg" className="w-full h-14 text-lg shadow-lg relative overflow-hidden" onClick={handleFinishSet}>
                 <span className="relative z-10 flex items-center gap-2">
                     <CheckCircle2 className="h-6 w-6" /> Terminar Serie

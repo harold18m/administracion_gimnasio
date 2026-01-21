@@ -28,6 +28,7 @@ export function ClientLayout() {
           <li>
             <NavLink
               to="/app/rutina"
+              onClick={() => window.dispatchEvent(new Event("reset-rutina-view"))}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center h-full space-y-1 transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground hover:text-primary/70"
