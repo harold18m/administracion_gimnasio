@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, Dialog
 import QRCode from "react-qr-code";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { ClientCalendarWidget } from "./components/ClientCalendarWidget";
 
 export default function ClientHome() {
   const { cliente, user, loading } = useClientAuth();
@@ -101,6 +102,19 @@ export default function ClientHome() {
             <p className="text-xs text-muted-foreground">Brillo al máximo recomendado</p>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Weekly Class Calendar */}
+      <div className="pt-2">
+        <ClientCalendarWidget />
+      </div>
+
+      <div className="fixed bottom-20 right-4 w-40 z-0 pointer-events-none opacity-100 filter drop-shadow-lg">
+          <img 
+              src="/images/erizo_inicio.webp" 
+              alt="Erizo Saludo" 
+              className="w-full h-auto"
+          />
       </div>
     </div>
   );

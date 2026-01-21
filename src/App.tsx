@@ -4,28 +4,37 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { GymLayout } from "./components/GymLayout";
-import Dashboard from "./pages/Dashboard";
-import Rutinas from "./pages/Rutinas";
-import Clientes from "./pages/Clientes";
-import Asistencia from "./pages/Asistencia";
-import Calendario from "./pages/Calendario";
-import Configuracion from "./pages/Configuracion";
-import Membresias from "./pages/Membresias";
-import Login from "./pages/Login";
-import Registro from "./pages/Registro";
-import Kiosko from "./pages/Kiosko";
-import Pagos from "./pages/Pagos";
-import Anuncios from "./pages/Anuncios";
+import React, { Suspense, lazy, useState, useEffect, createContext, useContext } from "react";
+import { Loader2 } from "lucide-react";
+
+// Lazy load Admin Pages
+const GymLayout = lazy(() => import("./components/GymLayout").then(module => ({ default: module.GymLayout })));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Rutinas = lazy(() => import("./pages/Rutinas"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const Asistencia = lazy(() => import("./pages/Asistencia"));
+const Calendario = lazy(() => import("./pages/Calendario"));
+const Configuracion = lazy(() => import("./pages/Configuracion"));
+const Membresias = lazy(() => import("./pages/Membresias"));
+const Pagos = lazy(() => import("./pages/Pagos"));
+const Anuncios = lazy(() => import("./pages/Anuncios"));
+const Perfil = lazy(() => import("./pages/Perfil"));
+
+// Lazy load Auth Pages
+const Login = lazy(() => import("./pages/Login"));
+const Registro = lazy(() => import("./pages/Registro"));
+const Kiosko = lazy(() => import("./pages/Kiosko"));
+
+// Lazy load Client Pages
+const ClientLayout = lazy(() => import("./layouts/ClientLayout").then(module => ({ default: module.ClientLayout })));
+const ClientLogin = lazy(() => import("./pages/client/ClientLogin"));
+const ClientHome = lazy(() => import("./pages/client/ClientHome"));
+const ClientRutina = lazy(() => import("./pages/client/ClientRutina"));
+const ClientPagos = lazy(() => import("./pages/client/ClientPagos"));
+const ClientPerfil = lazy(() => import("./pages/client/ClientPerfil"));
+
 import NotFound from "./pages/NotFound";
-import { useState, useEffect, createContext, useContext } from "react";
-import Perfil from "./pages/Perfil";
-import { ClientLayout } from "./layouts/ClientLayout";
-import ClientLogin from "./pages/client/ClientLogin";
-import ClientHome from "./pages/client/ClientHome";
-import ClientRutina from "./pages/client/ClientRutina";
-import ClientPagos from "./pages/client/ClientPagos";
-import ClientPerfil from "./pages/client/ClientPerfil";
+import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
 
 // Crear contexto de autenticación
 interface AuthContextType {
@@ -42,16 +51,14 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
-
-// ... previous imports ...
-
 // Componente de protección de rutas para Clientes
 const ClientProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useClientAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+    return <div className="flex items-center justify-center min-h-screen">
+       <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>;
   }
 
   if (!session) {
@@ -74,6 +81,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const queryClient = new QueryClient();
+
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center h-screen w-full bg-background">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+  </div>
+);
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
@@ -104,50 +117,51 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              {/* Rutas Públicas */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/registro" element={<Registro />} />
-              <Route path="/kiosko" element={<Kiosko />} />
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                {/* Rutas Públicas */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/registro" element={<Registro />} />
+                <Route path="/kiosko" element={<Kiosko />} />
 
-              {/* Rutas App Clientes */}
-              <Route path="/app/login" element={<ClientLogin />} />
-              <Route path="/app" element={
-                // Wrap Client Routes with Protected Logic
-                 <ClientProtectedRoute>
-                   <ClientLayout />
-                 </ClientProtectedRoute>
-              }>
-                <Route index element={<Navigate to="/app/home" replace />} />
-                <Route path="home" element={<ClientHome />} />
-                <Route path="rutina" element={<ClientRutina />} />
-                <Route path="pagos" element={<ClientPagos />} />
-                <Route path="perfil" element={<ClientPerfil />} />
-              </Route>
+                {/* Rutas App Clientes */}
+                <Route path="/app/login" element={<ClientLogin />} />
+                <Route path="/app" element={
+                  // Wrap Client Routes with Protected Logic
+                   <ClientProtectedRoute>
+                     <ClientLayout />
+                   </ClientProtectedRoute>
+                }>
+                  <Route index element={<Navigate to="/app/home" replace />} />
+                  <Route path="home" element={<ClientHome />} />
+                  <Route path="rutina" element={<ClientRutina />} />
+                  <Route path="pagos" element={<ClientPagos />} />
+                  <Route path="perfil" element={<ClientPerfil />} />
+                </Route>
 
-              {/* Rutas Protegidas Administrativas */}
-              <Route element={
-                <ProtectedRoute>
-                  <GymLayout />
-                </ProtectedRoute>
-              }>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/asistencia" element={<Asistencia />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/membresias" element={<Membresias />} />
-                <Route path="/perfil" element={<Perfil />} />
-                <Route path="/ejercicios" element={<Rutinas />} />
-                {/* Solo ruta de Rutinas */}
-                <Route path="/rutinas" element={<Rutinas />} />
-                {/* Página de WhatsApp eliminada */}
-                <Route path="/calendario" element={<Calendario />} />
-                <Route path="/pagos" element={<Pagos />} />
-                <Route path="/configuracion" element={<Configuracion />} />
-                <Route path="/anuncios" element={<Anuncios />} />
-              </Route>
+                {/* Rutas Protegidas Administrativas */}
+                <Route element={
+                  <ProtectedRoute>
+                    <GymLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/asistencia" element={<Asistencia />} />
+                  <Route path="/clientes" element={<Clientes />} />
+                  <Route path="/membresias" element={<Membresias />} />
+                  <Route path="/perfil" element={<Perfil />} />
+                  <Route path="/ejercicios" element={<Rutinas />} />
+                  {/* Solo ruta de Rutinas */}
+                  <Route path="/rutinas" element={<Rutinas />} />
+                  <Route path="/calendario" element={<Calendario />} />
+                  <Route path="/pagos" element={<Pagos />} />
+                  <Route path="/configuracion" element={<Configuracion />} />
+                  <Route path="/anuncios" element={<Anuncios />} />
+                </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>

@@ -77,6 +77,14 @@ export default function ClientPagos() {
           ))}
         </div>
       )}
+
+      <div className="fixed bottom-20 right-4 w-40 z-0 pointer-events-none opacity-100 filter drop-shadow-lg">
+          <img 
+              src="/images/erizo_pagos.webp" 
+              alt="Erizo Pagos" 
+              className="w-full h-auto"
+          />
+      </div>
     </div>
   );
 }

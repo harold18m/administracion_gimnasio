@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, Plus, Clock, Users, Dumbbell, Star, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, subDays, startOfWeek, endOfWeek } from "date-fns";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar as CalendarIcon, Plus, Clock, Users, Dumbbell, Star, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, subDays, startOfWeek, endOfWeek, addDays, addWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +32,7 @@ interface Evento {
   participantes_actuales: number;
   precio: number | null;
   notas?: string | null;
+  visible_para_clientes: boolean;
 }
 
 const Calendario = () => {
@@ -39,7 +42,11 @@ const Calendario = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const [nuevoEvento, setNuevoEvento] = useState<Partial<Evento>>({
+  const [nuevoEvento, setNuevoEvento] = useState<Partial<Evento> & { 
+    repetir: boolean; 
+    diasRepeticion: string[]; 
+    repeticionFin: string; // Fecha fin de repetición
+  }>({
     titulo: '',
     descripcion: '',
     fecha: '',
@@ -50,7 +57,11 @@ const Calendario = () => {
     entrenador: '',
     cliente_nombre: '',
     notas: '',
-    estado: 'programado'
+    estado: 'programado',
+    visible_para_clientes: true,
+    repetir: false,
+    diasRepeticion: [],
+    repeticionFin: ''
   });
 
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
@@ -116,22 +127,66 @@ const Calendario = () => {
       return;
     }
 
+    const eventosAInsertar = [];
+    
+    // Objeto base del evento
+    const eventoBase = {
+      titulo: nuevoEvento.titulo!,
+      descripcion: nuevoEvento.descripcion || '',
+      hora: nuevoEvento.hora!,
+      tipo: nuevoEvento.tipo || 'entrenamiento',
+      max_participantes: nuevoEvento.max_participantes || 1,
+      precio: nuevoEvento.precio ?? 0,
+      entrenador: nuevoEvento.entrenador || null,
+      cliente_nombre: nuevoEvento.cliente_nombre || null,
+      notas: nuevoEvento.notas || '',
+      estado: 'programado',
+      visible_para_clientes: nuevoEvento.visible_para_clientes ?? true
+    };
+
+    if (nuevoEvento.repetir && nuevoEvento.repeticionFin && nuevoEvento.diasRepeticion && nuevoEvento.diasRepeticion.length > 0) {
+      // Lógica de repetición
+      let fechaIteracion = new Date(nuevoEvento.fecha + 'T12:00:00'); // Usar mediodía para evitar problemas de zona horaria al iterar días
+      const fechaFin = new Date(nuevoEvento.repeticionFin + 'T12:00:00');
+      
+      // Mapeo de días de la semana (0 = Domingo, 1 = Lunes...) para comparar con getDay()
+      // Asumimos diasRepeticion guarda string como "Lun", "Mar", etc. O índices "1", "2".
+      // Vamos a usar índices string '0'-'6' para facilitar.
+      
+      while (fechaIteracion <= fechaFin) {
+        const diaSemana = fechaIteracion.getDay().toString();
+        
+        if (nuevoEvento.diasRepeticion.includes(diaSemana)) {
+           eventosAInsertar.push({
+             ...eventoBase,
+             fecha: format(fechaIteracion, 'yyyy-MM-dd')
+           });
+        }
+        fechaIteracion = addDays(fechaIteracion, 1);
+      }
+      
+    } else {
+      // Evento único
+      eventosAInsertar.push({
+        ...eventoBase,
+        fecha: nuevoEvento.fecha!
+      });
+    }
+
+    if (eventosAInsertar.length === 0) {
+        toast({
+            title: "Advertencia",
+            description: "No se generaron eventos con la configuración de repetición seleccionada. Verifica las fechas y días.",
+            variant: "destructive"
+        });
+        return;
+    }
+
+
     try {
       const { data, error } = await supabase
         .from('eventos')
-        .insert([{ 
-          titulo: nuevoEvento.titulo!,
-          descripcion: nuevoEvento.descripcion || '',
-          fecha: nuevoEvento.fecha!,
-          hora: nuevoEvento.hora!,
-          tipo: nuevoEvento.tipo || 'entrenamiento',
-          max_participantes: nuevoEvento.max_participantes || 1,
-          precio: nuevoEvento.precio ?? 0,
-          entrenador: nuevoEvento.entrenador || null,
-          cliente_nombre: nuevoEvento.cliente_nombre || null,
-          notas: nuevoEvento.notas || '',
-          estado: 'programado',
-        }])
+        .insert(eventosAInsertar)
         .select();
 
       if (error) {
@@ -146,7 +201,7 @@ const Calendario = () => {
 
       toast({
         title: "Éxito",
-        description: "Evento creado correctamente",
+        description: `Se crearon ${eventosAInsertar.length} evento(s) correctamente`,
       });
 
       await cargarEventos();
@@ -162,7 +217,11 @@ const Calendario = () => {
         entrenador: '',
         cliente_nombre: '',
         notas: '',
-        estado: 'programado'
+        estado: 'programado',
+        visible_para_clientes: true,
+        repetir: false,
+        diasRepeticion: [],
+        repeticionFin: ''
       });
       setDialogoAbierto(false);
     } catch (error) {
@@ -192,6 +251,15 @@ const Calendario = () => {
       default: return <CalendarIcon className="h-3 w-3" />;
     }
   };
+  
+  const toggleDiaRepeticion = (diaIndex: string) => {
+      const current = nuevoEvento.diasRepeticion || [];
+      if (current.includes(diaIndex)) {
+          setNuevoEvento({ ...nuevoEvento, diasRepeticion: current.filter(d => d !== diaIndex) });
+      } else {
+          setNuevoEvento({ ...nuevoEvento, diasRepeticion: [...current, diaIndex] });
+      }
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -213,7 +281,7 @@ const Calendario = () => {
               Nuevo Evento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Programar Nuevo Evento</DialogTitle>
               <DialogDescription>
@@ -221,90 +289,178 @@ const Calendario = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="titulo">Título</Label>
-                <Input
-                  id="titulo"
-                  value={nuevoEvento.titulo || ''}
-                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, titulo: e.target.value })}
-                  placeholder="Ej: Entrenamiento Personal - Cliente"
-                />
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="titulo">Título</Label>
+                    <Input
+                      id="titulo"
+                      value={nuevoEvento.titulo || ''}
+                      onChange={(e) => setNuevoEvento({ ...nuevoEvento, titulo: e.target.value })}
+                      placeholder="Ej: Zumba Class"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tipo">Tipo de Evento</Label>
+                    <Select value={nuevoEvento.tipo} onValueChange={(value: 'clase' | 'entrenamiento' | 'evento') => setNuevoEvento({ ...nuevoEvento, tipo: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entrenamiento">Entrenamiento Personal</SelectItem>
+                        <SelectItem value="clase">Clase Grupal</SelectItem>
+                        <SelectItem value="evento">Evento Especial</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
               </div>
               
-              <div>
-                <Label htmlFor="tipo">Tipo de Evento</Label>
-                <Select value={nuevoEvento.tipo} onValueChange={(value: 'clase' | 'entrenamiento' | 'evento') => setNuevoEvento({ ...nuevoEvento, tipo: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="entrenamiento">Entrenamiento Personal</SelectItem>
-                    <SelectItem value="clase">Clase Grupal</SelectItem>
-                    <SelectItem value="evento">Evento</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="fecha">Fecha</Label>
-                <Input
-                  id="fecha"
-                  type="date"
-                  value={nuevoEvento.fecha || ''}
-                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, fecha: e.target.value })}
-                />
+               <div className="flex items-center justify-between border p-3 rounded-md bg-muted/20">
+                    <div className="space-y-0.5">
+                        <Label className="text-base">Visible para clientes</Label>
+                        <p className="text-xs text-muted-foreground">
+                            Si está activo, los clientes verán este evento en su app.
+                        </p>
+                    </div>
+                    <Switch
+                        checked={nuevoEvento.visible_para_clientes}
+                        onCheckedChange={(checked) => setNuevoEvento({ ...nuevoEvento, visible_para_clientes: checked })}
+                    />
+               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="fecha">Fecha Inicio</Label>
+                    <Input
+                      id="fecha"
+                      type="date"
+                      value={nuevoEvento.fecha || ''}
+                      onChange={(e) => setNuevoEvento({ ...nuevoEvento, fecha: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Hora Inicio</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Select 
+                        value={nuevoEvento.hora ? nuevoEvento.hora.split(':')[0] : ''} 
+                        onValueChange={(hour) => {
+                          const currentMinute = nuevoEvento.hora?.split(':')[1] || '00';
+                          setNuevoEvento({ ...nuevoEvento, hora: `${hour}:${currentMinute}` });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="HH" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48">
+                          {Array.from({ length: 16 }, (_, i) => i + 6).map(h => (
+                              <SelectItem key={h} value={h.toString().padStart(2, '0')}>{h}:00</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select 
+                        value={nuevoEvento.hora?.split(':')[1] || '00'} 
+                        onValueChange={(minute) => {
+                          const currentHour = nuevoEvento.hora?.split(':')[0] || '08';
+                          setNuevoEvento({ ...nuevoEvento, hora: `${currentHour}:${minute}` });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="MM" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="00">:00</SelectItem>
+                          <SelectItem value="15">:15</SelectItem>
+                          <SelectItem value="30">:30</SelectItem>
+                          <SelectItem value="45">:45</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
               </div>
 
-              <div>
-                <Label>Hora</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Select 
-                    value={nuevoEvento.hora ? nuevoEvento.hora.split(':')[0] : ''} 
-                    onValueChange={(hour) => {
-                      const currentMinute = nuevoEvento.hora?.split(':')[1] || '00';
-                      setNuevoEvento({ ...nuevoEvento, hora: `${hour}:${currentMinute}` });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Hora" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="08">8:00 AM</SelectItem>
-                      <SelectItem value="09">9:00 AM</SelectItem>
-                      <SelectItem value="10">10:00 AM</SelectItem>
-                      <SelectItem value="11">11:00 AM</SelectItem>
-                      <SelectItem value="12">12:00 PM</SelectItem>
-                      <SelectItem value="13">1:00 PM</SelectItem>
-                      <SelectItem value="14">2:00 PM</SelectItem>
-                      <SelectItem value="15">3:00 PM</SelectItem>
-                      <SelectItem value="16">4:00 PM</SelectItem>
-                      <SelectItem value="17">5:00 PM</SelectItem>
-                      <SelectItem value="18">6:00 PM</SelectItem>
-                      <SelectItem value="19">7:00 PM</SelectItem>
-                      <SelectItem value="20">8:00 PM</SelectItem>
-                      <SelectItem value="21">9:00 PM</SelectItem>
-                      <SelectItem value="22">10:00 PM</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select 
-                    value={nuevoEvento.hora?.split(':')[1] || '00'} 
-                    onValueChange={(minute) => {
-                      const currentHour = nuevoEvento.hora?.split(':')[0] || '08';
-                      setNuevoEvento({ ...nuevoEvento, hora: `${currentHour}:${minute}` });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Min" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="00">:00</SelectItem>
-                      <SelectItem value="30">:30</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+               {/* Recurrence Section */}
+               <div className="border rounded-md p-4 space-y-3">
+                   <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="repetir" 
+                            checked={nuevoEvento.repetir}
+                            onCheckedChange={(checked) => setNuevoEvento({ ...nuevoEvento, repetir: checked === true })}
+                        />
+                        <Label htmlFor="repetir" className="font-semibold flex items-center gap-2 cursor-pointer">
+                            <Repeat className="h-4 w-4" /> Repetir evento
+                        </Label>
+                   </div>
+                   
+                   {nuevoEvento.repetir && (
+                       <div className="pl-6 space-y-3 pt-2 animation-all">
+                           <div>
+                               <Label className="mb-2 block text-xs uppercase text-muted-foreground">Repetir los días:</Label>
+                               <div className="flex flex-wrap gap-2">
+                                   {[
+                                       { label: 'L', value: '1' }, 
+                                       { label: 'M', value: '2' }, 
+                                       { label: 'M', value: '3' }, 
+                                       { label: 'J', value: '4' }, 
+                                       { label: 'V', value: '5' }, 
+                                       { label: 'S', value: '6' }, 
+                                       { label: 'D', value: '0' }
+                                   ].map((dia) => (
+                                       <div 
+                                            key={dia.value}
+                                            onClick={() => toggleDiaRepeticion(dia.value)}
+                                            className={`
+                                                w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer transition-colors border
+                                                ${nuevoEvento.diasRepeticion?.includes(dia.value) 
+                                                    ? 'bg-primary text-primary-foreground border-primary' 
+                                                    : 'bg-background hover:bg-muted text-muted-foreground'}
+                                            `}
+                                       >
+                                           {dia.label}
+                                       </div>
+                                   ))}
+                               </div>
+                           </div>
+                           
+                           <div>
+                               <Label htmlFor="fechaFin" className="mb-1 block">Repetir hasta:</Label>
+                               <Input
+                                  id="fechaFin"
+                                  type="date"
+                                  value={nuevoEvento.repeticionFin || ''}
+                                  onChange={(e) => setNuevoEvento({ ...nuevoEvento, repeticionFin: e.target.value })}
+                                  className="w-full"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Se crearán eventos individuales para cada día seleccionado hasta esta fecha.
+                                </p>
+                           </div>
+                       </div>
+                   )}
+               </div>
               
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="entrenador">Entrenador (Opcional)</Label>
+                    <Input
+                      id="entrenador"
+                      value={nuevoEvento.entrenador || ''}
+                      onChange={(e) => setNuevoEvento({ ...nuevoEvento, entrenador: e.target.value })}
+                      placeholder="Nombre del coach"
+                    />
+                  </div>
+                  <div>
+                     <Label htmlFor="max_parts">Cupos Máximos</Label>
+                     <Input
+                        id="max_parts"
+                        type="number"
+                        min="1"
+                        value={nuevoEvento.max_participantes}
+                        onChange={(e) => setNuevoEvento({ ...nuevoEvento, max_participantes: parseInt(e.target.value) || 20 })}
+                     />
+                  </div>
+              </div>
+
               <div>
                 <Label htmlFor="descripcion">Descripción</Label>
                 <Textarea
@@ -312,11 +468,11 @@ const Calendario = () => {
                   value={nuevoEvento.descripcion || ''}
                   onChange={(e) => setNuevoEvento({ ...nuevoEvento, descripcion: e.target.value })}
                   placeholder="Detalles adicionales..."
-                  rows={3}
+                  rows={2}
                 />
               </div>
               
-              <Button onClick={agregarEvento} className="w-full">
+              <Button onClick={agregarEvento} className="w-full h-10 mt-2">
                 Programar Evento
               </Button>
             </div>
