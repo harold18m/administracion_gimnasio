@@ -40,3 +40,15 @@ export function diffDaysFromTodayLocal(dateStr: string | null | undefined): numb
   const msPerDay = 1000 * 60 * 60 * 24;
   return Math.ceil((startOfEnd.getTime() - startOfToday.getTime()) / msPerDay);
 }
+
+// Para timestamps completos (ej: asistencias), respeta la zona horaria UTC -> Local
+export function formatTimestampToLocalDate(
+  dateStr: string | null | undefined,
+  locale: string = "es-ES",
+  options?: Intl.DateTimeFormatOptions
+): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(locale, options);
+}

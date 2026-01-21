@@ -623,7 +623,7 @@ export default function Kiosko() {
               {/* Overlays encima de la cámara: acceso concedido o denegado */}
               {overlayVisible && (
                 overlayKind === "granted" && ultimoCliente && ultimoCliente.estado === "activa" && !estaVencidaPorFecha(ultimoCliente.fecha_fin) ? (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
                     <div className="max-w-sm w-[90%] rounded-2xl bg-white shadow-2xl overflow-hidden">
                       {/* Header verde */}
                       <div className="bg-emerald-500 px-6 py-8 text-center">
@@ -683,7 +683,7 @@ export default function Kiosko() {
                     </div>
                   </div>
                 ) : overlayKind === "denied" ? (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 backdrop-blur-sm">
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/50 backdrop-blur-[2px]">
                     <div className="max-w-md w-[92%] rounded-2xl border border-red-700/40 bg-neutral-900/90 p-6 text-center">
                       <div className="flex flex-col items-center mb-4">
                         <div className="h-16 w-16 rounded-full bg-red-600/10 border border-red-500/40 flex items-center justify-center mb-2">

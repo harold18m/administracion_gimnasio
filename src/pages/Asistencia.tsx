@@ -34,7 +34,7 @@ import {
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
-import { formatISODate } from "@/lib/utils";
+import { formatISODate, formatTimestampToLocalDate } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const estadoStyle = {
@@ -621,7 +621,7 @@ export default function Asistencia() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{formatISODate(asistencia.fecha)}</p>
+                            <p className="font-medium">{formatTimestampToLocalDate(asistencia.fecha)}</p>
                             <p className="text-xs text-muted-foreground">{asistencia.hora}</p>
                           </div>
                         </TableCell>
