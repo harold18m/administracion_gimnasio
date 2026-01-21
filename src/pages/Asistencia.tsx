@@ -45,6 +45,8 @@ const estadoStyle = {
 
 
 
+import { useSound } from "@/hooks/useSound";
+
 export default function Asistencia() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dniInput, setDniInput] = useState("");
@@ -56,6 +58,7 @@ export default function Asistencia() {
   const [asistencias, setAsistencias] = useState<Database["public"]["Tables"]["asistencias"]["Row"][]>([]);
   const [modoAsistencia, setModoAsistencia] = useState<"qr" | "dni">("dni");
   const { toast } = useToast();
+  const { playSuccess, playError } = useSound();
   // Gestión de pantallas múltiples
   const [screens, setScreens] = useState<any[]>([]);
   const [selectedScreenIndex, setSelectedScreenIndex] = useState<string>("0");
@@ -183,12 +186,24 @@ export default function Asistencia() {
     setAsistencias(data || []);
   };
 
-  const registrarAsistencia = async (cliente: Database["public"]["Tables"]["clientes"]["Row"], tipo: "codigo" | "dni") => {
-    if (cliente.estado === "vencida" || cliente.estado === "suspendida") {
+    const registrarAsistencia = async (cliente: Database["public"]["Tables"]["clientes"]["Row"], tipo: "codigo" | "dni") => {
+    // Strict Validation
+    if (!cliente.membresia_id) {
+      playError();
+      toast({
+        variant: "destructive",
+        title: "Registro denegado",
+        description: "El cliente no tiene ninguna membresía asignada.",
+      });
+      return;
+    }
+
+    if (cliente.estado === "vencida" || cliente.estado === "suspendida" || !cliente.fecha_fin) {
+      playError();
       toast({
         variant: "destructive",
         title: "Error de registro",
-        description: "La membresía de este cliente no está activa.",
+        description: "La membresía no está activa o ha vencido.",
       });
       return;
     }
@@ -207,6 +222,7 @@ export default function Asistencia() {
       .lte("fecha_asistencia", endOfDay.toISOString());
 
     if (errorCheck) {
+      playError();
       toast({
         variant: "destructive",
         title: "Error de verificación",
@@ -216,6 +232,7 @@ export default function Asistencia() {
     }
 
     if (yaHoy && yaHoy.length > 0) {
+      playError();
       toast({
         variant: "destructive",
         title: "Registro duplicado",
@@ -224,17 +241,22 @@ export default function Asistencia() {
       return;
     }
 
+    // Usar hora actual explícita
+    const fechaActualISO = new Date().toISOString();
+
     const { data: inserted, error: errorInsert } = await supabase
       .from("asistencias")
       .insert({
         cliente_id: cliente.id,
         estado: "presente",
         notas: tipo,
+        fecha_asistencia: fechaActualISO
       })
       .select("id, cliente_id, fecha_asistencia, notas, created_at")
       .single();
 
     if (errorInsert) {
+      playError();
       toast({
         variant: "destructive",
         title: "Error registrando asistencia",
@@ -243,6 +265,7 @@ export default function Asistencia() {
       return;
     }
 
+    playSuccess();
     setAsistencias((prev) => (inserted ? [inserted, ...prev] : prev));
 
     const hora = new Date(inserted?.fecha_asistencia || Date.now())
@@ -259,6 +282,7 @@ export default function Asistencia() {
 
   const registrarPorDNI = async () => {
     if (!dniInput) {
+      playError();
       toast({
         variant: "destructive",
         title: "Error de registro",
@@ -274,6 +298,7 @@ export default function Asistencia() {
       .maybeSingle();
 
     if (error) {
+      playError();
       toast({
         variant: "destructive",
         title: "Error buscando cliente",
@@ -283,6 +308,7 @@ export default function Asistencia() {
     }
 
     if (!cliente) {
+      playError();
       toast({
         variant: "destructive",
         title: "Cliente no encontrado",
@@ -296,26 +322,41 @@ export default function Asistencia() {
   const registrarPorQR = async (code?: string) => {
     const normalized = String((code ?? codigoInput) || "").trim().toUpperCase();
     if (!normalized) {
+      playError();
       toast({ variant: "destructive", title: "Error de registro", description: "Ingresa un código válido." });
       return;
     }
 
-    const { data: cliente, error } = await supabase
+    // Buscar TODOS los clientes que tengan ese código QR
+    const { data: clientesEncontrados, error } = await supabase
       .from("clientes")
       .select("id, nombre, dni, estado, avatar_url")
-      .eq("codigo_qr", normalized)
-      .maybeSingle();
+      .eq("codigo_qr", normalized);
 
     if (error) {
+      playError();
       toast({ variant: "destructive", title: "Error buscando cliente", description: error.message });
       return;
     }
 
-    if (!cliente) {
-      toast({ variant: "destructive", title: "Cliente no encontrado", description: "Verifica que el código escaneado coincida exactamente con el guardado en el perfil del cliente." });
+    if (!clientesEncontrados || clientesEncontrados.length === 0) {
+      playError();
+      toast({ variant: "destructive", title: "Cliente no encontrado", description: "El código QR no está asignado a ningún cliente." });
       return;
     }
 
+    if (clientesEncontrados.length > 1) {
+      playError();
+      console.warn("Múltiples clientes encontrados con el mismo QR:", clientesEncontrados);
+      toast({ 
+        variant: "destructive", 
+        title: "Código QR Duplicado", 
+        description: `Error crítico: Este código QR pertenece a ${clientesEncontrados.length} personas (${clientesEncontrados.map(c => c.nombre).join(", ")}). Por favor corrige esto en la sección Clientes.` 
+      });
+      return;
+    }
+
+    const cliente = clientesEncontrados[0];
     await registrarAsistencia(cliente, "qr");
   };
 

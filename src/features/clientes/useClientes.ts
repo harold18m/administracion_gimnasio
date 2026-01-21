@@ -110,6 +110,32 @@ export const useClientes = () => {
       : null;
 
     try {
+      // Validar duplicidad de Código QR antes de proceder
+      const qrToCheck = values.codigo_qr ? values.codigo_qr.trim().toUpperCase() : null;
+      if (qrToCheck) {
+        let query = supabase.from('clientes').select('id, nombre').eq('codigo_qr', qrToCheck);
+        
+        // Si estamos editando, excluir al cliente actual
+        if (clienteActual) {
+          query = query.neq('id', clienteActual.id);
+        }
+        
+        const { data: duplicates, error: dupError } = await query;
+        
+        if (dupError) {
+          throw dupError;
+        }
+
+        if (duplicates && duplicates.length > 0) {
+          toast({
+            variant: "destructive",
+            title: "Código QR no disponible",
+            description: `El código ${qrToCheck} ya está asignado a ${duplicates[0].nombre}.`
+          });
+          throw new Error("Código QR duplicado");
+        }
+      }
+
       if (clienteActual) {
         // Editar cliente existente
         const updateData: ClienteUpdate = {
@@ -181,8 +207,9 @@ export const useClientes = () => {
 
         if (error) throw error;
         
-        // Solo actualizar código QR si el usuario generó uno manualmente
         let updated = data;
+        // Solo actualizar código QR si el usuario generó uno manualmente
+        // NOTA: La validación de duplicados ya se hizo arriba
         if (values.codigo_qr && values.codigo_qr.trim().length > 0) {
           const codigoFinal = values.codigo_qr.trim().toUpperCase();
           const { data: updatedData, error: errorCode } = await supabase
@@ -213,11 +240,14 @@ export const useClientes = () => {
       }
     } catch (err) {
       console.error('Error al guardar cliente:', err);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar el cliente",
-        variant: "destructive",
-      });
+      // Si el error no fue manejado (como el de duplicado), mostrar genérico
+      if (err instanceof Error && err.message !== "Código QR duplicado") {
+         toast({
+          title: "Error",
+          description: "No se pudo guardar el cliente",
+          variant: "destructive",
+        });
+      }
       throw err;
     }
   };

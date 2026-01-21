@@ -6,9 +6,11 @@ import { Scanner } from "@yudiel/react-qr-scanner";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase";
 import { Camera, CheckCircle2, User2, IdCard, Star, CalendarRange, XCircle, AlertTriangle, BarChart3, Maximize } from "lucide-react";
+import { useSound } from "@/hooks/useSound";
 
 export default function Kiosko() {
   const { toast } = useToast();
+  const { playSuccess, playError } = useSound();
   const [scanActive] = useState(true);
   const [horaActual, setHoraActual] = useState<string>(new Date().toLocaleTimeString());
   const [puertaEstado, setPuertaEstado] = useState<"desconectada" | "conectada" | "abriendo" | "error">("desconectada");
@@ -19,48 +21,23 @@ export default function Kiosko() {
   const [ultimoCodigoQR, setUltimoCodigoQR] = useState<string>("");
   const [overlayVisible, setOverlayVisible] = useState<boolean>(false);
   const [overlayKind, setOverlayKind] = useState<"granted" | "denied" | null>(null);
-  const [overlayDeniedReason, setOverlayDeniedReason] = useState<"unknown" | "expired" | "suspended" | "weekly_limit" | null>(null);
+  const [overlayDeniedReason, setOverlayDeniedReason] = useState<"unknown" | "expired" | "suspended" | "weekly_limit" | "duplicate" | "no_membership" | null>(null);
   const [asistenciasSemana, setAsistenciasSemana] = useState<number>(0);
   const LIMITE_SEMANAL_INTERDIARIO = 3;
   const lastCodeRef = useRef<string>("");
   const lastTimeRef = useRef<number>(0);
   const overlayTimerRef = useRef<number | null>(null);
   const scannerAreaRef = useRef<HTMLDivElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  // audioCtxRef removed in favor of useSound hook
   const serialPortRef = useRef<any>(null);
   const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(null);
   const encoderRef = useRef(new TextEncoder());
 
-  const playAccessSound = async () => {
-    try {
-      if (!audioCtxRef.current) {
-        const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
-        audioCtxRef.current = AC ? new AC() : null;
-      }
-      const ctx = audioCtxRef.current;
-      if (!ctx) return;
-      if (ctx.state === "suspended") {
-        try { await ctx.resume(); } catch {}
-      }
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(440, ctx.currentTime); // tono bajo
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 0.02); // volumen suave
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.26);
-    } catch {
-      // Silenciar cualquier error de audio para no interrumpir el flujo del kiosko
-    }
-  };
+  // playAccessSound function removed in favor of useSound hook
 
   // Determina si la membresía está vencida por fecha_fin
   const estaVencidaPorFecha = (fin?: string | null) => {
-    if (!fin) return false;
+    if (!fin) return true; // Si no hay fecha fin, asumimos que no es válida o está vencida
     const ahora = new Date();
     const finDate = new Date(fin);
     // Considera vigente hasta el final del día local de fecha_fin
@@ -72,14 +49,47 @@ export default function Kiosko() {
     cliente: Database["public"]["Tables"]["clientes"]["Row"],
     esInterdiario?: boolean
   ) => {
+    // Validación estricta de Membresía
+    if (!cliente.membresia_id) {
+       playError();
+       setUltimoCliente(cliente);
+       setOverlayKind("denied");
+       setOverlayDeniedReason("no_membership");
+       setOverlayVisible(true);
+       if (overlayTimerRef.current) {
+         clearTimeout(overlayTimerRef.current);
+         overlayTimerRef.current = null;
+       }
+       overlayTimerRef.current = window.setTimeout(() => {
+         setOverlayVisible(false);
+         setOverlayKind(null);
+         setOverlayDeniedReason(null);
+         setUltimoCliente(null);
+         setUltimoCodigoQR("");
+       }, 3000);
+       return;
+    }
+
     const vencidaPorFecha = estaVencidaPorFecha(cliente.fecha_fin);
     const suspendida = cliente.estado === "suspendida";
     const vencidaEstado = cliente.estado === "vencida";
-    if (vencidaPorFecha || suspendida || vencidaEstado) {
+    
+    // Si no está activa explícitamente y no es ninguna de las anteriores, verificamos estado
+    // Asumimos que si no es "activa", no debe entrar (salvo excepciones controladas)
+    const noActiva = cliente.estado !== "activa";
+
+    if (vencidaPorFecha || suspendida || vencidaEstado || noActiva) {
       // Mostrar overlay de acceso denegado
+      playError();
       setUltimoCliente(cliente);
       setOverlayKind("denied");
-      setOverlayDeniedReason(vencidaPorFecha || vencidaEstado ? "expired" : "suspended");
+      
+      let reason: "expired" | "suspended" | "unknown" = "expired";
+      if (suspendida) reason = "suspended";
+      else if (vencidaPorFecha || vencidaEstado) reason = "expired";
+      else if (noActiva) reason = "suspended"; // Fallback para otros estados no activos
+
+      setOverlayDeniedReason(reason);
       setOverlayVisible(true);
       if (overlayTimerRef.current) {
         clearTimeout(overlayTimerRef.current);
@@ -164,13 +174,14 @@ export default function Kiosko() {
           setUltimoCliente(null);
           setUltimoCodigoQR("");
         }, 3000);
-        playAccessSound();
+        playSuccess();
         abrirCerradura();
         return;
       }
       
       // Si alcanzó el límite y no tiene asistencia hoy, denegar
       if (asistenciasSemanales >= LIMITE_SEMANAL_INTERDIARIO) {
+        playError();
         setUltimoCliente(cliente);
         setOverlayKind("denied");
         setOverlayDeniedReason("weekly_limit");
@@ -226,14 +237,22 @@ export default function Kiosko() {
         setUltimoCliente(null);
         setUltimoCodigoQR("");
       }, 3000);
-      playAccessSound();
+      playSuccess();
       abrirCerradura();
       return;
     }
 
+    // Usar hora actual explícita
+    const fechaActualISO = new Date().toISOString();
+
     const { data: inserted, error: errorInsert } = await supabase
       .from("asistencias")
-      .insert({ cliente_id: cliente.id, estado: "presente", notas: "qr" })
+      .insert({ 
+        cliente_id: cliente.id, 
+        estado: "presente", 
+        notas: "qr",
+        fecha_asistencia: fechaActualISO 
+      })
       .select("id, cliente_id, fecha_asistencia")
       .single();
 
@@ -264,7 +283,7 @@ export default function Kiosko() {
       setUltimoCodigoQR("");
     }, 3000);
     // Sonido de acceso concedido
-    playAccessSound();
+    playSuccess();
     abrirCerradura();
   };
 
@@ -318,6 +337,7 @@ export default function Kiosko() {
 
   const registrarPorQR = async (valor: string) => {
     if (!valor) {
+      playError();
       toast({ variant: "destructive", title: "Código inválido", description: "Intenta nuevamente." });
       return;
     }
@@ -330,18 +350,20 @@ export default function Kiosko() {
     lastCodeRef.current = valor;
     lastTimeRef.current = now;
 
-    const { data: cliente, error } = await supabase
+    // Buscar TODOS los clientes que tengan ese código QR (para detectar duplicados)
+    const { data: clientesEncontrados, error } = await supabase
       .from("clientes")
       .select("id, nombre, dni, estado, avatar_url, nombre_membresia, tipo_membresia, fecha_fin, membresia_id")
-      .eq("codigo_qr", valor)
-      .maybeSingle();
+      .eq("codigo_qr", valor);
 
     if (error) {
+      playError();
       toast({ variant: "destructive", title: "Error buscando cliente", description: error.message });
       return;
     }
 
-    if (!cliente) {
+    if (!clientesEncontrados || clientesEncontrados.length === 0) {
+      playError();
       // Mostrar overlay de acceso denegado por usuario no registrado
       setOverlayKind("denied");
       setOverlayDeniedReason("unknown");
@@ -358,6 +380,29 @@ export default function Kiosko() {
       }, 3000);
       return;
     }
+
+    if (clientesEncontrados.length > 1) {
+      playError();
+      // En modo Kiosko, no podemos mostrar un toast con nombres facilmente legible en pantalla completa
+      // Usaremos el overlay de "Desconocido" o "Denegado" con un mensaje especial si es posible,
+      // pero por ahora usaremos "duplicate" como razón (que añadiremos arriba)
+      setOverlayKind("denied");
+      setOverlayDeniedReason("duplicate");
+      setUltimoCliente(null);
+      setOverlayVisible(true);
+      if (overlayTimerRef.current) {
+        clearTimeout(overlayTimerRef.current);
+        overlayTimerRef.current = null;
+      }
+      overlayTimerRef.current = window.setTimeout(() => {
+        setOverlayVisible(false);
+        setOverlayKind(null);
+        setOverlayDeniedReason(null);
+      }, 3000);
+      return;
+    }
+
+    const cliente = clientesEncontrados[0];
 
     // Consultar nombre y modalidad de la membresía para mostrar correctamente
     let esInterdiario = false;
@@ -650,11 +695,39 @@ export default function Kiosko() {
                           {overlayDeniedReason === "expired" && "Membresía vencida"}
                           {overlayDeniedReason === "suspended" && "Membresía suspendida"}
                           {overlayDeniedReason === "weekly_limit" && "Límite semanal alcanzado"}
+                          {overlayDeniedReason === "duplicate" && "Código QR Duplicado"}
                         </div>
                       </div>
 
                       {/* Contenido variable según motivo de denegación */}
-                      {overlayDeniedReason === "unknown" ? (
+                       {overlayDeniedReason === "no_membership" ? (
+                         <div className="rounded-xl border border-red-700/30 bg-red-900/10 p-6 text-center flex flex-col items-center justify-center min-h-[160px]">
+                           <div className="flex items-center gap-3 mb-4">
+                             <IdCard className="h-8 w-8 text-red-300" />
+                             <div className="text-2xl font-bold text-white">Sin Membresía</div>
+                           </div>
+                           <div className="text-3xl font-extrabold text-red-100 leading-tight mb-2">
+                             No tienes una membresía asignada
+                           </div>
+                           <div className="text-center text-[11px] text-neutral-400 mt-6">Redirigiendo en 3 segundos...</div>
+                         </div>
+                       ) : overlayDeniedReason === "duplicate" ? (
+                         <div className="rounded-xl border border-red-700/30 bg-red-900/10 p-4 text-left">
+                           <div className="flex items-center gap-3 mb-3">
+                             <AlertTriangle className="h-5 w-5 text-red-300" />
+                             <div className="text-base font-semibold">Error Crítico</div>
+                           </div>
+                           <div className="text-sm text-neutral-200 font-semibold mb-2">Código QR asignado a múltiples personas</div>
+                           <p className="text-sm text-neutral-300 mb-2">
+                             Este código no es seguro porque pertenece a más de un usuario.
+                           </p>
+                           <ul className="text-sm text-neutral-300 list-disc pl-5 space-y-1">
+                             <li>Por favor, dirígete a recepción inmediatamente.</li>
+                             <li>El personal debe asignar un nuevo código único.</li>
+                           </ul>
+                           <div className="text-center text-[11px] text-neutral-400 mt-3">Redirigiendo en 3 segundos...</div>
+                         </div>
+                       ) : overlayDeniedReason === "unknown" ? (
                         <div className="rounded-xl border border-red-700/30 bg-red-900/10 p-4 text-left">
                           <div className="flex items-center gap-3 mb-3">
                             <AlertTriangle className="h-5 w-5 text-red-300" />
