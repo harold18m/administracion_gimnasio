@@ -40,12 +40,14 @@ import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
 // Crear contexto de autenticación
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: () => void;
+  userEmail: string | null;
+  login: (email: string) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
+  userEmail: null,
   login: () => { },
   logout: () => { },
 });
@@ -70,11 +72,12 @@ const ClientProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userEmail } = useAuth();
+  
+  // Verificación estricta de administrador
+  const isAdmin = isAuthenticated && userEmail === "admin@fitgym.com";
 
-  // Para simplificar, asumimos autenticado durante desarrollo
-  // En una implementación real, esto verificaría el estado de autenticación
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !isAdmin) {
     return <Navigate to="/login" replace />;
   }
 
@@ -90,28 +93,39 @@ const LoadingFallback = () => (
 );
 
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    true // Cambiado a true para desarrollo - permite acceso directo a la configuración
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  const login = () => {
+  const login = (email: string) => {
     localStorage.setItem("fitgym-auth", "true");
+    localStorage.setItem("fitgym-admin-email", email);
     setIsAuthenticated(true);
+    setUserEmail(email);
   };
 
   const logout = () => {
     localStorage.removeItem("fitgym-auth");
+    localStorage.removeItem("fitgym-admin-email");
     setIsAuthenticated(false);
+    setUserEmail(null);
   };
 
   // Verificar token en el almacenamiento local al cargar
   useEffect(() => {
     const token = localStorage.getItem("fitgym-auth");
-    setIsAuthenticated(token === "true");
+    const email = localStorage.getItem("fitgym-admin-email");
+    
+    if (token === "true" && email === "admin@fitgym.com") {
+      setIsAuthenticated(true);
+      setUserEmail(email);
+    } else {
+       // Si hay token pero el email no es admin, limpiar (seguridad por si acaso)
+       if (token) logout();
+    }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, userEmail, login, logout }}>
       <ClientAuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>

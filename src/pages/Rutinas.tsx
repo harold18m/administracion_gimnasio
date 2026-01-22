@@ -134,6 +134,10 @@ export default function Rutinas() {
   const [confirmExerciseDeleteOpen, setConfirmExerciseDeleteOpen] = useState(false);
   const [exerciseToDelete, setExerciseToDelete] = useState<string | null>(null);
 
+  // State - Pagination
+  const [visibleExercisesCount, setVisibleExercisesCount] = useState(9);
+
+
   const imageSizeClass = exporting ? 'h-20 w-20' : 'h-12 w-12';
 
   // --- Handlers Ejercicios ---
@@ -447,7 +451,7 @@ export default function Rutinas() {
             <Button className="mt-3" onClick={abrirNuevoEjercicio}>Nuevo Ejercicio</Button>
           </div>
         )}
-        {ejerciciosFiltradosUI.map((ejercicio) => (
+        {ejerciciosFiltradosUI.slice(0, visibleExercisesCount).map((ejercicio) => (
           <Card key={ejercicio.id}>
             <CardHeader className="relative">
               <div className="absolute right-4 top-4 space-x-1">
@@ -517,6 +521,19 @@ export default function Rutinas() {
           </Card>
         ))}
       </div>
+      )}
+
+      {tab === 'ejercicios' && visibleExercisesCount < ejerciciosFiltradosUI.length && (
+        <div className="flex justify-center mt-6">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="w-full sm:w-auto min-w-[200px]"
+            onClick={() => setVisibleExercisesCount(prev => prev + 9)}
+          >
+            Ver más ejercicios ({ejerciciosFiltradosUI.length - visibleExercisesCount} restantes)
+          </Button>
+        </div>
       )}
 
       {tab === 'rutinas' && (

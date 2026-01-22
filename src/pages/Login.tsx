@@ -35,16 +35,27 @@ export default function Login() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
+      // Validación estricta de email de administrador
+      if (values.email !== "admin@fitgym.com") {
+         toast({
+          variant: "destructive",
+          title: "Acceso denegado",
+          description: "Solo administradores autorizados pueden acceder.",
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Aquí se implementaría la autenticación real con Supabase o Firebase
       console.log("Login data:", values);
 
-      // Llamar a la función login del contexto
-      login();
+      // Llamar a la función login del contexto con el email
+      login(values.email);
 
       // Mostrar mensaje de éxito y redirigir
       toast({
         title: "Inicio de sesión exitoso",
-        description: "Bienvenido a FitGym",
+        description: "Bienvenido al panel, Administrador.",
       });
 
       navigate("/");
