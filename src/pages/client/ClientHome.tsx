@@ -1,15 +1,72 @@
 import { useClientAuth } from "@/hooks/useClientAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { QrCode, Calendar, CreditCard, AlertCircle } from "lucide-react";
+import { QrCode, Calendar, HelpCircle, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import QRCode from "react-qr-code";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { ClientCalendarWidget } from "./components/ClientCalendarWidget";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 
 export default function ClientHome() {
   const { cliente, user, loading } = useClientAuth();
+
+  const startTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      nextBtnText: 'Siguiente',
+      prevBtnText: 'Anterior',
+      doneBtnText: 'Entendido',
+      steps: [
+        { 
+          element: '#help-btn', 
+          popover: { 
+            title: 'Bienvenido a FitGym', 
+            description: 'Usa este botón cuando tengas dudas sobre cómo usar la aplicación.' 
+          } 
+        },
+        { 
+          element: '#section-qr', 
+          popover: { 
+            title: 'Tu Llave de Acceso', 
+            description: 'Toca aquí para mostrar tu código QR en la entrada del gimnasio.' 
+          } 
+        },
+        { 
+          element: '#section-calendar', 
+          popover: { 
+            title: 'Clases Grupales', 
+            description: 'Consulta el horario de clases y planifica tu semana desde aquí.' 
+          } 
+        },
+        { 
+          element: '#nav-rutina', 
+          popover: { 
+            title: 'Tu Entrenamiento', 
+            description: 'Aquí encontrarás tus rutinas personalizadas y podrás registrar tus ejercicios.' 
+          } 
+        },
+        { 
+          element: '#nav-pagos', 
+          popover: { 
+            title: 'Membresía y Pagos', 
+            description: 'Revisa el estado de tu plan y realiza pagos de forma segura.' 
+          } 
+        },
+        { 
+          element: '#nav-perfil', 
+          popover: { 
+            title: 'Tu Perfil', 
+            description: 'Gestiona tus datos personales y cierra sesión aquí.' 
+          } 
+        },
+      ]
+    });
+
+    driverObj.drive();
+  };
 
   if (loading) {
     return <div className="p-8 text-center animate-pulse">Cargando tu información...</div>;
@@ -19,7 +76,12 @@ export default function ClientHome() {
   if (!cliente) {
     return (
       <div className="p-4 space-y-4">
-        <h1 className="text-2xl font-bold">Hola, {user?.email}</h1>
+        <div className="flex justify-between items-center">
+             <h1 className="text-2xl font-bold">Hola, {user?.email}</h1>
+             <Button variant="ghost" size="icon" onClick={startTour} id="help-btn">
+                <HelpCircle className="h-6 w-6 text-muted-foreground" />
+             </Button>
+        </div>
         <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
@@ -43,11 +105,16 @@ export default function ClientHome() {
   const esActivo = cliente.estado === 'activa';
   
   return (
-    <div className="p-4 space-y-6 max-w-md mx-auto">
+    <div className="p-4 space-y-6 max-w-md mx-auto relative">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-3xl font-extrabold tracking-tight">Hola, {cliente.nombre.split(' ')[0]}</h1>
-        <p className="text-muted-foreground font-medium">¡A entrenar!</p>
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+            <h1 className="text-3xl font-extrabold tracking-tight">Hola, {cliente.nombre.split(' ')[0]}</h1>
+            <p className="text-muted-foreground font-medium">¡A entrenar!</p>
+        </div>
+        <Button variant="ghost" size="icon" onClick={startTour} id="help-btn" className="mt-1 h-12 w-12">
+            <HelpCircle className="h-8 w-8 text-muted-foreground" />
+        </Button>
       </div>
 
       {/* Membership Card */}
@@ -79,7 +146,7 @@ export default function ClientHome() {
       </Card>
 
       {/* Actions */}
-      <div className="grid gap-3">
+      <div className="grid gap-3" id="section-qr">
         <Dialog>
           <DialogTrigger asChild>
             <Button size="lg" className="w-full h-16 text-lg bg-foreground hover:bg-foreground/90 shadow-xl transition-all active:scale-[0.98]">
@@ -105,7 +172,7 @@ export default function ClientHome() {
       </div>
 
       {/* Weekly Class Calendar */}
-      <div className="pt-2">
+      <div className="pt-2" id="section-calendar">
         <ClientCalendarWidget />
       </div>
 

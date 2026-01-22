@@ -15,6 +15,7 @@ export function ClientLayout() {
           <li>
             <NavLink
               to="/app/home"
+              id="nav-home"
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center h-full space-y-1 transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground hover:text-primary/70"
@@ -28,6 +29,7 @@ export function ClientLayout() {
           <li>
             <NavLink
               to="/app/rutina"
+              id="nav-rutina"
               onClick={() => window.dispatchEvent(new Event("reset-rutina-view"))}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center h-full space-y-1 transition-colors ${
@@ -42,6 +44,7 @@ export function ClientLayout() {
           <li>
             <NavLink
               to="/app/pagos"
+              id="nav-pagos"
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center h-full space-y-1 transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground hover:text-primary/70"
@@ -55,6 +58,7 @@ export function ClientLayout() {
           <li>
             <NavLink
               to="/app/perfil"
+              id="nav-perfil"
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center h-full space-y-1 transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground hover:text-primary/70"

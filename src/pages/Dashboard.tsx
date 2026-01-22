@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
-import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { MembershipChart } from "@/components/dashboard/MembershipChart";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -311,13 +310,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Ingresos (Mes)"
-          value={`S/ ${stats.ingresosMes.toLocaleString("es-PE")}`}
-          icon={DollarSign}
-          description="Ingresos acumulados este mes"
-          iconColor="text-green-500"
-        />
+
         <StatCard
           title="Clientes Totales"
           value={String(stats.totalClientes)}
@@ -341,18 +334,13 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <RevenueChart />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <ActivityChart />
         <MembershipChart />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-8 gap-6">
-        <div className="md:col-span-5">
-          <ActivityChart />
-        </div>
-        <div className="md:col-span-3">
-          <PaymentStatusPanel />
-        </div>
+      <div className="grid grid-cols-1 gap-6">
+        <PaymentStatusPanel />
       </div>
     </div>
   );
