@@ -129,6 +129,10 @@ export default function Rutinas() {
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [targetDuplicateClient, setTargetDuplicateClient] = useState<string>("none");
   const [rutinaToDuplicate, setRutinaToDuplicate] = useState<string | null>(null);
+  
+  // State - Confirm Delete Exercise
+  const [confirmExerciseDeleteOpen, setConfirmExerciseDeleteOpen] = useState(false);
+  const [exerciseToDelete, setExerciseToDelete] = useState<string | null>(null);
 
   const imageSizeClass = exporting ? 'h-20 w-20' : 'h-12 w-12';
 
@@ -450,7 +454,7 @@ export default function Rutinas() {
                 <Button variant="ghost" size="icon" onClick={() => abrirEditarEjercicio(ejercicio.id)}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteEjercicio(ejercicio.id)}>
+                <Button variant="ghost" size="icon" className="text-red-500" onClick={() => { setExerciseToDelete(ejercicio.id); setConfirmExerciseDeleteOpen(true); }}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -1020,6 +1024,31 @@ export default function Rutinas() {
           </AlertDialog>
         </div>
       )}
+      <AlertDialog open={confirmExerciseDeleteOpen} onOpenChange={setConfirmExerciseDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar ejercicio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El ejercicio se eliminará permanentemente de tu biblioteca.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setExerciseToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700" 
+              onClick={() => {
+                if (exerciseToDelete) {
+                  deleteEjercicio(exerciseToDelete);
+                  setExerciseToDelete(null);
+                  toast({ title: 'Ejercicio eliminado', description: 'El ejercicio ha sido eliminado correctamente.' });
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
