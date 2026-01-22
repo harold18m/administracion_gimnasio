@@ -8,6 +8,13 @@ import { useNavigate } from "react-router-dom";
 import { Dumbbell, Loader2, LogIn, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function ClientLogin() {
   const [email, setEmail] = useState("");
@@ -17,6 +24,11 @@ export default function ClientLogin() {
   const [activeTab, setActiveTab] = useState("login");
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Reset Password State
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +149,16 @@ export default function ClientLogin() {
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
                   Ingresar
                 </Button>
+                
+                <div className="text-center pt-2">
+                    <button 
+                        type="button" 
+                        onClick={() => setResetOpen(true)}
+                        className="text-sm text-primary hover:underline"
+                    >
+                        ¿Olvidaste tu contraseña?
+                    </button>
+                </div>
               </form>
             </TabsContent>
             
@@ -189,6 +211,61 @@ export default function ClientLogin() {
           </Tabs>
         </CardContent>
       </Card>
+
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recuperar Contraseña</DialogTitle>
+            <DialogDescription>
+              Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
+            </DialogDescription>
+          </DialogHeader>
+          <form 
+            onSubmit={async (e) => {
+                e.preventDefault();
+                setResetLoading(true);
+                try {
+                    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+                        redirectTo: `${window.location.origin}/app/update-password`,
+                    });
+                    if (error) throw error;
+                    toast({
+                        title: "Correo enviado",
+                        description: "Si el correo existe, recibirás un enlace de recuperación.",
+                    });
+                    setResetOpen(false);
+                    setResetEmail("");
+                } catch (error: any) {
+                    toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description: error.message || "No se pudo enviar el correo.",
+                    });
+                } finally {
+                    setResetLoading(false);
+                }
+            }}
+            className="space-y-4 pt-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Correo electrónico</Label>
+              <Input 
+                id="reset-email" 
+                type="email" 
+                placeholder="tu@email.com" 
+                required 
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={resetLoading}>
+              {resetLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Enviar enlace de recuperación"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

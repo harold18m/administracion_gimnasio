@@ -32,6 +32,7 @@ const ClientHome = lazy(() => import("./pages/client/ClientHome"));
 const ClientRutina = lazy(() => import("./pages/client/ClientRutina"));
 const ClientPagos = lazy(() => import("./pages/client/ClientPagos"));
 const ClientPerfil = lazy(() => import("./pages/client/ClientPerfil"));
+const ClientUpdatePassword = lazy(() => import("./pages/client/ClientUpdatePassword"));
 
 import NotFound from "./pages/NotFound";
 import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
@@ -126,6 +127,7 @@ const App = () => {
 
                 {/* Rutas App Clientes */}
                 <Route path="/app/login" element={<ClientLogin />} />
+                <Route path="/app/update-password" element={<ClientUpdatePassword />} />
                 <Route path="/app" element={
                   // Wrap Client Routes with Protected Logic
                    <ClientProtectedRoute>
