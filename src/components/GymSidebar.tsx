@@ -67,15 +67,18 @@ const sidebarSections: { label: string; items: SidebarItem[] }[] = [
   },
 ];
 
+import { useGymSettings } from '@/hooks/useGymSettings';
+
 export function GymSidebar() {
   const { pathname } = useLocation();
   const { state } = useSidebar();
+  const { logoUrl } = useGymSettings();
 
   return (
     <Sidebar className="border-r" variant="sidebar" collapsible="icon" data-testid="sidebar">
       <SidebarHeader className="flex h-24 items-center px-4">
         <Link to="/" className="flex items-center gap-2">
-          <Logo withText={state !== 'collapsed'} size={120} />
+          <Logo withText={state !== 'collapsed'} size={120} src={logoUrl} />
         </Link>
         <div className="ml-auto flex items-center gap-1 md:hidden">
           <SidebarTrigger>

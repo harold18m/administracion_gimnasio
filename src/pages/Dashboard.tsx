@@ -156,11 +156,19 @@ function usePaymentStatus() {
           .order("fecha_fin", { ascending: true })
           .limit(5);
 
-        // Clientes vencidos
-        const { count: clientesVencidos } = await supabase
+        // Clientes vencidos (por estado o fecha)
+        const { count: vencidosPorEstado } = await supabase
           .from("clientes")
           .select("*", { count: "exact", head: true })
           .eq("estado", "vencida");
+
+        const { count: vencidosPorFecha } = await supabase
+          .from("clientes")
+          .select("*", { count: "exact", head: true })
+          .eq("estado", "activa")
+          .lt("fecha_fin", today.toISOString());
+
+        const clientesVencidos = (vencidosPorEstado || 0) + (vencidosPorFecha || 0);
 
         // Calcular días restantes para los próximos vencimientos
         const proximosVencimientos =

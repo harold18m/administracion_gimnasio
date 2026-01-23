@@ -20,7 +20,7 @@ export function MembershipChart() {
       // Fetch all clients with a membership
       const { data: clients, error } = await supabase
         .from('clientes')
-        .select('nombre_membresia, estado')
+        .select('nombre_membresia, estado, fecha_fin')
         .not('membresia_id', 'is', null);
 
       if (error) {
@@ -29,12 +29,16 @@ export function MembershipChart() {
       }
 
       const counts = new Map<string, number>();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       
       clients?.forEach(c => {
         let name = c.nombre_membresia || 'Sin Nombre';
+        const fechaFin = c.fecha_fin ? new Date(c.fecha_fin) : null;
         
         // Categorize by status or name
-        if (c.estado === 'vencida') {
+        // Comprobar si está vencida por estado O por fecha
+        if (c.estado === 'vencida' || (fechaFin && fechaFin < today)) {
           name = 'Vencidas';
         } else if (c.estado === 'suspendida') {
           name = 'Suspendidas';

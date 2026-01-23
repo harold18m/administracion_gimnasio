@@ -190,6 +190,9 @@ export default function ClientRutina() {
     if (n.includes("yoga") || n.includes("flexibilidad") || n.includes("estiramiento")) {
       return "https://www.centrovallereal.com/wp-content/uploads/sites/38/2019/07/yoga-disciplina.jpg";
     }
+    if (n.includes("brazos") || n.includes("hombro") || n.includes("estiramiento")) {
+      return "https://hdmymeakubioetnvzzax.supabase.co/storage/v1/object/public/app/mujer_para_fondo.webp";
+    }
     if (n.includes("crossfit") || n.includes("funcional")) {
       return "https://images.unsplash.com/photo-1517963879466-cd11fa693184?auto=format&fit=crop&q=80&w=600";
     }

@@ -92,7 +92,10 @@ const LoadingFallback = () => (
   </div>
 );
 
+import { useGymSettings } from "./hooks/useGymSettings";
+
 const App = () => {
+  useGymSettings(); // Initialize global settings (theme, logo)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 

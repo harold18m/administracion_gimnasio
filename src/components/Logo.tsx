@@ -6,12 +6,14 @@ export type LogoProps = {
     className?: string;
     textClassName?: string;
     alt?: string;
+    src?: string;
 };
 
 export function Logo({
     size = 72,
     className = "",
     alt = "FitGym logo",
+    src,
 }: LogoProps) {
     return (
         <div
@@ -19,7 +21,7 @@ export function Logo({
             aria-label="Fitgym"
         >
             <img
-                src="https://github.com/Ludran1/fitgym-admin/blob/main/public/fitgym-logo.png?raw=true"
+                src={src || "https://github.com/Ludran1/fitgym-admin/blob/main/public/fitgym-logo.png?raw=true"}
                 loading="eager"
                 className="rounded-lg"
                 width={size}
