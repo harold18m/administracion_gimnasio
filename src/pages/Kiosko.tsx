@@ -479,15 +479,18 @@ export default function Kiosko() {
         {anuncio.titulo && (
           <h2 className="text-4xl font-bold mb-6 tracking-tight">{anuncio.titulo}</h2>
         )}
-        {anuncio.tipo === 'texto' ? (
-          <p className="text-2xl leading-relaxed whitespace-pre-wrap max-w-lg">{anuncio.contenido}</p>
-        ) : anuncio.contenido ? (
+        
+        {anuncio.contenido && (
+          <p className="text-2xl leading-relaxed whitespace-pre-wrap max-w-lg mb-8">{anuncio.contenido}</p>
+        )}
+
+        {anuncio.url_imagen && (
           <img 
-            src={anuncio.contenido} 
+            src={anuncio.url_imagen} 
             alt="Anuncio" 
-            className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-2xl"
+            className="max-w-full max-h-[50vh] object-contain rounded-xl shadow-2xl"
           />
-        ) : null}
+        )}
       </div>
     );
   };

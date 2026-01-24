@@ -4,18 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Megaphone, Image, Type, Save, Eye, PanelLeft, PanelRight } from "lucide-react";
+import { Megaphone, Save, Eye, PanelLeft, PanelRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 interface AnuncioConfig {
   id?: string;
   posicion: 'izquierda' | 'derecha';
-  tipo: 'texto' | 'imagen';
-  contenido: string;
+  contenido: string; // Used for text
+  url_imagen: string; // Used for image URL
   titulo: string;
   activo: boolean;
   color_fondo: string;
@@ -24,8 +22,8 @@ interface AnuncioConfig {
 
 const defaultAnuncio: AnuncioConfig = {
   posicion: 'izquierda',
-  tipo: 'texto',
   contenido: '',
+  url_imagen: '',
   titulo: '',
   activo: true,
   color_fondo: '#1a1a1a',
@@ -55,28 +53,21 @@ export default function Anuncios() {
 
         if (data) {
           data.forEach(anuncio => {
+            const config: AnuncioConfig = {
+              id: anuncio.id,
+              posicion: anuncio.posicion as 'izquierda' | 'derecha',
+              contenido: anuncio.contenido || '',
+              url_imagen: anuncio.url_imagen || '',
+              titulo: anuncio.titulo || '',
+              activo: anuncio.activo,
+              color_fondo: anuncio.color_fondo || '#1a1a1a',
+              color_texto: anuncio.color_texto || '#ffffff'
+            };
+
             if (anuncio.posicion === 'izquierda') {
-              setAnuncioIzquierda({
-                id: anuncio.id,
-                posicion: 'izquierda',
-                tipo: anuncio.tipo as 'texto' | 'imagen',
-                contenido: anuncio.contenido || '',
-                titulo: anuncio.titulo || '',
-                activo: anuncio.activo,
-                color_fondo: anuncio.color_fondo || '#1a1a1a',
-                color_texto: anuncio.color_texto || '#ffffff'
-              });
+              setAnuncioIzquierda(config);
             } else if (anuncio.posicion === 'derecha') {
-              setAnuncioDerecha({
-                id: anuncio.id,
-                posicion: 'derecha',
-                tipo: anuncio.tipo as 'texto' | 'imagen',
-                contenido: anuncio.contenido || '',
-                titulo: anuncio.titulo || '',
-                activo: anuncio.activo,
-                color_fondo: anuncio.color_fondo || '#1a1a1a',
-                color_texto: anuncio.color_texto || '#ffffff'
-              });
+              setAnuncioDerecha(config);
             }
           });
         }
@@ -98,8 +89,9 @@ export default function Anuncios() {
         .upsert({
           id: anuncio.id,
           posicion: anuncio.posicion,
-          tipo: anuncio.tipo,
+          tipo: 'texto', // Legacy field required by DB constraint
           contenido: anuncio.contenido,
+          url_imagen: anuncio.url_imagen,
           titulo: anuncio.titulo,
           activo: anuncio.activo,
           color_fondo: anuncio.color_fondo,
@@ -153,32 +145,7 @@ export default function Anuncios() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label>Tipo de contenido</Label>
-          <Select
-            value={anuncio.tipo}
-            onValueChange={(value: 'texto' | 'imagen') => setAnuncio({ ...anuncio, tipo: value })}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="texto">
-                <div className="flex items-center gap-2">
-                  <Type className="h-4 w-4" />
-                  <span>Texto</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="imagen">
-                <div className="flex items-center gap-2">
-                  <Image className="h-4 w-4" />
-                  <span>Imagen (URL)</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
+        
         <div>
           <Label>Título (opcional)</Label>
           <Input
@@ -190,23 +157,25 @@ export default function Anuncios() {
         </div>
 
         <div>
-          <Label>{anuncio.tipo === 'texto' ? 'Contenido' : 'URL de la imagen'}</Label>
-          {anuncio.tipo === 'texto' ? (
-            <Textarea
-              value={anuncio.contenido}
-              onChange={(e) => setAnuncio({ ...anuncio, contenido: e.target.value })}
-              placeholder="Escribe el texto que deseas mostrar..."
-              rows={4}
-              className="mt-1"
-            />
-          ) : (
-            <Input
-              value={anuncio.contenido}
-              onChange={(e) => setAnuncio({ ...anuncio, contenido: e.target.value })}
-              placeholder="https://ejemplo.com/imagen.jpg"
-              className="mt-1"
-            />
-          )}
+          <Label>Contenido de Texto</Label>
+          <Textarea
+            value={anuncio.contenido}
+            onChange={(e) => setAnuncio({ ...anuncio, contenido: e.target.value })}
+            placeholder="Escribe el mensaje..."
+            rows={3}
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+           <Label>URL de Imagen (Opcional)</Label>
+           <Input
+             value={anuncio.url_imagen}
+             onChange={(e) => setAnuncio({ ...anuncio, url_imagen: e.target.value })}
+             placeholder="https://ejemplo.com/promo.jpg"
+             className="mt-1"
+           />
+           <p className="text-xs text-muted-foreground mt-1">La imagen se mostrará debajo del texto.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -248,28 +217,33 @@ export default function Anuncios() {
         <div>
           <Label className="flex items-center gap-2 mb-2">
             <Eye className="h-4 w-4" />
-            Vista previa
+            Vista previa aproximada
           </Label>
           <div
-            className="rounded-lg p-4 min-h-[120px] flex flex-col items-center justify-center text-center"
+            className="rounded-lg p-4 min-h-[120px] flex flex-col items-center justify-center text-center gap-4"
             style={{ backgroundColor: anuncio.color_fondo, color: anuncio.color_texto }}
           >
             {anuncio.titulo && (
-              <h3 className="font-bold text-lg mb-2">{anuncio.titulo}</h3>
+              <h3 className="font-bold text-lg">{anuncio.titulo}</h3>
             )}
-            {anuncio.tipo === 'texto' ? (
-              <p className="whitespace-pre-wrap">{anuncio.contenido || 'Sin contenido'}</p>
-            ) : anuncio.contenido ? (
+            
+            {anuncio.contenido && (
+                 <p className="whitespace-pre-wrap">{anuncio.contenido}</p>
+            )}
+
+            {anuncio.url_imagen ? (
               <img
-                src={anuncio.contenido}
+                src={anuncio.url_imagen}
                 alt="Preview"
                 className="max-h-32 object-contain rounded"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="10" y="50" fill="red">Error</text></svg>';
                 }}
               />
-            ) : (
-              <p className="opacity-50">URL de imagen vacía</p>
+            ) : null}
+            
+            {!anuncio.contenido && !anuncio.url_imagen && (
+                <p className="opacity-50 text-sm italic">Sin contenido</p>
             )}
           </div>
         </div>
@@ -303,7 +277,7 @@ export default function Anuncios() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Anuncios del Kiosko</h1>
           <p className="text-muted-foreground">
-            Personaliza los paneles laterales de la pantalla del kiosko
+            Personaliza los paneles laterales. Ahora puedes incluir texto e imagen simultáneamente.
           </p>
         </div>
       </div>
