@@ -10,7 +10,8 @@ import {
   Scan,
   Zap,
   Copy,
-  Users
+  Users,
+  GripVertical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,6 +137,118 @@ export default function Rutinas() {
 
   // State - Pagination
   const [visibleExercisesCount, setVisibleExercisesCount] = useState(9);
+
+  // State - Drag and Drop
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const dragOverItemIndex = useRef<number | null>(null);
+
+  // Revised Drag and Drop Handlers
+  const onDragStart = (e: React.DragEvent, index: number) => {
+      setDraggedItemIndex(index);
+      e.dataTransfer.effectAllowed = "move";
+      // Set a ghost image or similar if needed, default is usually fine
+  };
+
+  const onDragOver = (e: React.DragEvent, index: number) => {
+      e.preventDefault(); // Necessary to allow dropping
+      e.dataTransfer.dropEffect = "move";
+      // Only update if different to avoid flickering
+      if (dragOverItemIndex.current !== index) {
+          dragOverItemIndex.current = index;
+      }
+  };
+  
+  const onDropItem = (e: React.DragEvent, targetIndex: number, targetDay: string) => {
+      e.preventDefault();
+      if (draggedItemIndex === null) return;
+      if (draggedItemIndex === targetIndex) return;
+
+      const newDetalle = [...rutinaDetalle];
+      const [movedItem] = newDetalle.splice(draggedItemIndex, 1);
+      
+      // Update the day of the moved item
+      movedItem.dia = targetDay;
+      
+      // We need to adjust targetIndex because removing the item might shift indices
+      // But `targetIndex` is the index in the original array.
+      // If we remove an item before targetIndex, targetIndex should be -1.
+      // But `splice` modifies in place.
+      
+      // Let's do it carefully.
+      // We have the original index `draggedItemIndex` and the target index `targetIndex`.
+      
+      // If we just insert at `targetIndex`, it works?
+      // Example: [A, B, C, D]. Move A (0) to C (2).
+      // Remove A: [B, C, D].
+      // Insert at 2? [B, C, A, D]. Correct.
+      
+      // Example: [A, B, C, D]. Move C (2) to A (0).
+      // Remove C: [A, B, D].
+      // Insert at 0? [C, A, B, D]. Correct.
+      
+      // Wait, if I move 0 to 2. 
+      // Splice(0, 1) -> [B, C, D].
+      // Splice(2, 0, A) -> [B, C, A, D].
+      // But wait, if I target C (which was at 2), after removal of A, C is at 1.
+      // So if I use the ORIGINAL index 2, I insert at 2, which is after C.
+      // So it becomes [B, C, A, D].
+      
+      // If I move 2 to 0.
+      // Splice(2, 1) -> [A, B, D].
+      // Splice(0, 0, C) -> [C, A, B, D].
+      
+      // It seems using the original targetIndex works if `draggedItemIndex < targetIndex` we might need to adjust?
+      // Actually, if draggedItemIndex < targetIndex, the target shifts down by 1.
+      // So we should insert at targetIndex - 1?
+      // Let's trace: Move A(0) to C(2). Target is C.
+      // Remove A. Array is [B, C, D].
+      // We want [B, C, A, D] (after C) or [B, A, C, D] (before C)?
+      // Usually drop ON an item implies "place before this item" or "swap".
+      // Standard sortable behavior is "place before".
+      // If I drop on C, I expect A to be before C. [B, A, C, D].
+      // So I need to insert at index of C.
+      // Current index of C is 1 (after A removal). Original was 2.
+      // So if dragged < target, we insert at target - 1.
+      
+      let finalTargetIndex = targetIndex;
+      if (draggedItemIndex < targetIndex) {
+          finalTargetIndex = targetIndex - 1;
+      }
+      // If dragged > target, target index hasn't changed.
+      
+      newDetalle.splice(finalTargetIndex, 0, movedItem);
+      
+      // Update order property
+      const reordered = newDetalle.map((item, idx) => ({ ...item, orden: idx + 1 }));
+      
+      setRutinaDetalle(reordered);
+      setDraggedItemIndex(null);
+      dragOverItemIndex.current = null;
+  };
+  
+  const onDropContainer = (e: React.DragEvent, targetDay: string) => {
+      e.preventDefault();
+      // This is called if we drop on the empty space of a day container
+      // We should append to that day.
+      if (draggedItemIndex === null) return;
+      
+      // Check if we dropped on a specific item (stopPropagation should prevent this bubbling, but just in case)
+      // Actually, we'll put the handler on the container and `stopPropagation` on items.
+      
+      const newDetalle = [...rutinaDetalle];
+      const [movedItem] = newDetalle.splice(draggedItemIndex, 1);
+      movedItem.dia = targetDay;
+      
+      // Just push to end? Or find last index of that day?
+      // If we push to end of array, it becomes the last item.
+      // Since we filter by day for display, it will show up at the bottom of that day's list.
+      newDetalle.push(movedItem);
+      
+      const reordered = newDetalle.map((item, idx) => ({ ...item, orden: idx + 1 }));
+      setRutinaDetalle(reordered);
+      setDraggedItemIndex(null);
+  };
+
 
 
   const imageSizeClass = exporting ? 'h-20 w-20' : 'h-12 w-12';
@@ -598,7 +711,12 @@ export default function Rutinas() {
                   {diasPreset === '3' || diasPreset === '5' ? (
                     <div className="space-y-4">
                       {Array.from({ length: diasPreset === '3' ? 3 : 5 }, (_, i) => `${i+1}`).map((dia) => (
-                        <div key={dia} className="space-y-2 border rounded-md p-3 bg-muted/20">
+                        <div 
+                          key={dia} 
+                          className="space-y-2 border rounded-md p-3 bg-muted/20 min-h-[100px]"
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => onDropContainer(e, dia)}
+                        >
                           <div className="font-semibold text-sm flex items-center gap-2">
                               {/* Display actual day name if available */}
                               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">
@@ -608,19 +726,34 @@ export default function Rutinas() {
                           {(rutinaDetalle.filter(d => (d.dia || '1') === dia)).map((item, _idx) => {
                             const idx = rutinaDetalle.findIndex(d => d === item);
                             return (
-                              <div key={`dia-${dia}-idx-${idx}`} className="grid md:grid-cols-6 gap-2 items-end bg-card p-2 rounded border">
-                                <div className="md:col-span-2">
-                                  <ExerciseCombobox
-                                    value={item.ejercicio_id}
-                                    options={ejercicios}
-                                    onChange={(v) => {
-                                      setRutinaDetalle(prev => {
-                                        const next = [...prev];
-                                        next[idx].ejercicio_id = v;
-                                        return next;
-                                      });
-                                    }}
-                                  />
+                              <div 
+                                key={`dia-${dia}-idx-${idx}`} 
+                                className={`grid md:grid-cols-6 gap-2 items-end bg-card p-2 rounded border transition-opacity ${draggedItemIndex === idx ? 'opacity-50 border-dashed' : ''}`}
+                                draggable
+                                onDragStart={(e) => onDragStart(e, idx)}
+                                onDragOver={(e) => onDragOver(e, idx)}
+                                onDrop={(e) => {
+                                    e.stopPropagation(); // Prevent container drop
+                                    onDropItem(e, idx, dia);
+                                }}
+                              >
+                                <div className="md:col-span-2 flex items-center gap-2">
+                                  <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                                    <GripVertical className="h-5 w-5" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <ExerciseCombobox
+                                      value={item.ejercicio_id}
+                                      options={ejercicios}
+                                      onChange={(v) => {
+                                        setRutinaDetalle(prev => {
+                                          const next = [...prev];
+                                          next[idx].ejercicio_id = v;
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                  </div>
                                 </div>
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
@@ -677,19 +810,41 @@ export default function Rutinas() {
                     <>
                       {rutinaDetalle.map((item, idx) => {
                         return (
-                          <div key={idx} className="grid md:grid-cols-6 gap-2 items-end">
-                            <div className="md:col-span-2">
-                              <ExerciseCombobox
-                                value={item.ejercicio_id}
-                                options={ejercicios}
-                                onChange={(v) => {
-                                  setRutinaDetalle(prev => {
-                                    const next = [...prev];
-                                    next[idx].ejercicio_id = v;
-                                    return next;
-                                  });
-                                }}
-                              />
+                          <div 
+                            key={idx} 
+                            className={`grid md:grid-cols-6 gap-2 items-end transition-opacity ${draggedItemIndex === idx ? 'opacity-50 border-dashed border' : ''}`}
+                            draggable
+                            onDragStart={(e) => onDragStart(e, idx)}
+                            onDragOver={(e) => onDragOver(e, idx)}
+                            onDrop={(e) => {
+                                e.stopPropagation();
+                                onDropItem(e, idx, item.dia || '1'); // Default to '1' or keep existing logic?
+                                // In "Libre" mode (diasPreset !== 3 && !== 5), we might not have 'dia' strictly defined or used for grouping.
+                                // But the code above maps `rutinaDetalle.map`.
+                                // If we are in "Libre" mode, we display ALL items in one list.
+                                // So `targetDay` might not be relevant for grouping, but we should preserve it if it exists.
+                                // Actually, in the "else" block (Libre mode), we don't group by day.
+                                // So `targetDay` passed to `onDropItem` might be just the item's current day or null.
+                                // Let's pass `item.dia` or null.
+                            }}
+                          >
+                            <div className="md:col-span-2 flex items-center gap-2">
+                                <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                                    <GripVertical className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1">
+                                  <ExerciseCombobox
+                                    value={item.ejercicio_id}
+                                    options={ejercicios}
+                                    onChange={(v) => {
+                                      setRutinaDetalle(prev => {
+                                        const next = [...prev];
+                                        next[idx].ejercicio_id = v;
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </div>
                             </div>
                             <Input className="h-9 text-sm" type="number" placeholder="Series" value={item.series ?? ''} onChange={(e) => {
                               const val = e.target.value;
