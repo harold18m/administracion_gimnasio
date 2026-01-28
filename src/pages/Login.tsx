@@ -12,6 +12,7 @@ import { Dumbbell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/App";
 import Logo from "@/components/Logo";
+import { supabase } from "@/lib/supabase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Correo electrónico inválido" }),
@@ -35,36 +36,43 @@ export default function Login() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // Validación estricta de email de administrador
-      if (values.email !== "admin@fitgym.com") {
-         toast({
-          variant: "destructive",
-          title: "Acceso denegado",
-          description: "Solo administradores autorizados pueden acceder.",
-        });
-        setIsLoading(false);
-        return;
+      // 1. Check Admin
+      if (values.email === "admin@fitgym.com") {
+         // Admin Login (Mocked for now as per original code, or we could verify password if we had one)
+         // Assuming admin password check is skipped or handled elsewhere, but original code just checked email.
+         // Let's keep original behavior for admin but maybe add a dummy password check if needed.
+         // Original code: if (values.email !== "admin@fitgym.com") ...
+         
+         // We'll just proceed as admin
+         login(values.email, 'admin', []);
+         toast({ title: "Inicio de sesión exitoso", description: "Bienvenido, Administrador." });
+         navigate("/");
+         return;
       }
 
-      // Aquí se implementaría la autenticación real con Supabase o Firebase
-      console.log("Login data:", values);
+      // 2. Check Employee
+      const { data, error } = await supabase
+        .from('empleados')
+        .select('*')
+        .eq('email', values.email)
+        .eq('password', values.password) // Plain text for now as per plan
+        .single();
 
-      // Llamar a la función login del contexto con el email
-      login(values.email);
+      if (error || !data) {
+        throw new Error("Credenciales incorrectas");
+      }
 
-      // Mostrar mensaje de éxito y redirigir
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido al panel, Administrador.",
-      });
-
+      // Employee Login
+      login(data.email, 'empleado', data.permisos || []);
+      toast({ title: "Inicio de sesión exitoso", description: `Bienvenido, ${data.nombre}.` });
       navigate("/");
+
     } catch (error) {
-      setIsLoading(false);
+      console.error(error);
       toast({
         variant: "destructive",
         title: "Error al iniciar sesión",
-        description: "Credenciales incorrectas",
+        description: "Credenciales incorrectas o acceso denegado.",
       });
     } finally {
       setIsLoading(false);

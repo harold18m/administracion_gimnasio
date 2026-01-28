@@ -19,6 +19,7 @@ const Membresias = lazy(() => import("./pages/Membresias"));
 const Pagos = lazy(() => import("./pages/Pagos"));
 const Anuncios = lazy(() => import("./pages/Anuncios"));
 const Perfil = lazy(() => import("./pages/Perfil"));
+const Empleados = lazy(() => import("./pages/Empleados"));
 
 // Lazy load Auth Pages
 const Login = lazy(() => import("./pages/Login"));
@@ -41,13 +42,17 @@ import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
 interface AuthContextType {
   isAuthenticated: boolean;
   userEmail: string | null;
-  login: (email: string) => void;
+  userRole: 'admin' | 'empleado' | null;
+  permissions: string[];
+  login: (email: string, role?: 'admin' | 'empleado', permissions?: string[]) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   userEmail: null,
+  userRole: null,
+  permissions: [],
   login: () => { },
   logout: () => { },
 });
@@ -71,14 +76,24 @@ const ClientProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, userEmail } = useAuth();
+const ProtectedRoute = ({ children, requiredPermission }: { children: React.ReactNode, requiredPermission?: string }) => {
+  const { isAuthenticated, userRole, permissions } = useAuth();
   
-  // Verificación estricta de administrador
-  const isAdmin = isAuthenticated && userEmail === "admin@fitgym.com";
-
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Admin has access to everything
+  if (userRole === 'admin') {
+    return <>{children}</>;
+  }
+
+  // Check permissions for employees
+  if (requiredPermission && !permissions.includes(requiredPermission)) {
+    // Redirect to dashboard or show unauthorized
+    // If trying to access dashboard but doesn't have permission, maybe show a generic "No access" page?
+    // For now, redirect to first allowed page or login if none
+    return <Navigate to="/" replace />; 
   }
 
   return <>{children}</>;
@@ -98,37 +113,66 @@ const App = () => {
   useGymSettings(); // Initialize global settings (theme, logo)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'empleado' | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
 
-  const login = (email: string) => {
+  const login = (email: string, role: 'admin' | 'empleado' = 'admin', perms: string[] = []) => {
     localStorage.setItem("fitgym-auth", "true");
-    localStorage.setItem("fitgym-admin-email", email);
+    localStorage.setItem("fitgym-user-email", email);
+    localStorage.setItem("fitgym-user-role", role);
+    localStorage.setItem("fitgym-user-permissions", JSON.stringify(perms));
+    
     setIsAuthenticated(true);
     setUserEmail(email);
+    setUserRole(role);
+    setPermissions(perms);
   };
 
   const logout = () => {
     localStorage.removeItem("fitgym-auth");
+    localStorage.removeItem("fitgym-user-email");
+    localStorage.removeItem("fitgym-user-role");
+    localStorage.removeItem("fitgym-user-permissions");
+    // Legacy cleanup
     localStorage.removeItem("fitgym-admin-email");
+    
     setIsAuthenticated(false);
     setUserEmail(null);
+    setUserRole(null);
+    setPermissions([]);
   };
 
   // Verificar token en el almacenamiento local al cargar
   useEffect(() => {
     const token = localStorage.getItem("fitgym-auth");
-    const email = localStorage.getItem("fitgym-admin-email");
+    // Check for new keys first, fallback to legacy
+    const email = localStorage.getItem("fitgym-user-email") || localStorage.getItem("fitgym-admin-email");
+    const role = localStorage.getItem("fitgym-user-role") as 'admin' | 'empleado' | null;
+    const permsStr = localStorage.getItem("fitgym-user-permissions");
     
-    if (token === "true" && email === "admin@fitgym.com") {
+    if (token === "true" && email) {
       setIsAuthenticated(true);
       setUserEmail(email);
+      
+      // If legacy admin login (no role stored), assume admin
+      if (!role && email === "admin@fitgym.com") {
+          setUserRole('admin');
+          setPermissions([]);
+      } else {
+          setUserRole(role || 'empleado');
+          try {
+              setPermissions(permsStr ? JSON.parse(permsStr) : []);
+          } catch {
+              setPermissions([]);
+          }
+      }
     } else {
-       // Si hay token pero el email no es admin, limpiar (seguridad por si acaso)
        if (token) logout();
     }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userEmail, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, userEmail, userRole, permissions, login, logout }}>
       <ClientAuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
@@ -164,18 +208,30 @@ const App = () => {
                     <GymLayout />
                   </ProtectedRoute>
                 }>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/asistencia" element={<Asistencia />} />
-                  <Route path="/clientes" element={<Clientes />} />
-                  <Route path="/membresias" element={<Membresias />} />
-                  <Route path="/perfil" element={<Perfil />} />
-                  <Route path="/ejercicios" element={<Rutinas />} />
-                  {/* Solo ruta de Rutinas */}
-                  <Route path="/rutinas" element={<Rutinas />} />
-                  <Route path="/calendario" element={<Calendario />} />
-                  <Route path="/pagos" element={<Pagos />} />
-                  <Route path="/configuracion" element={<Configuracion />} />
-                  <Route path="/anuncios" element={<Anuncios />} />
+                  <Route path="/" element={<ProtectedRoute requiredPermission="dashboard"><Dashboard /></ProtectedRoute>} />
+                  <Route path="/asistencia" element={<ProtectedRoute requiredPermission="asistencia"><Asistencia /></ProtectedRoute>} />
+                  <Route path="/clientes" element={<ProtectedRoute requiredPermission="clientes"><Clientes /></ProtectedRoute>} />
+                  <Route path="/membresias" element={<ProtectedRoute requiredPermission="membresias"><Membresias /></ProtectedRoute>} />
+                  <Route path="/perfil" element={<ProtectedRoute requiredPermission="perfil"><Perfil /></ProtectedRoute>} />
+                  <Route path="/ejercicios" element={<ProtectedRoute requiredPermission="rutinas"><Rutinas /></ProtectedRoute>} />
+                  <Route path="/rutinas" element={<ProtectedRoute requiredPermission="rutinas"><Rutinas /></ProtectedRoute>} />
+                  <Route path="/calendario" element={<ProtectedRoute requiredPermission="calendario"><Calendario /></ProtectedRoute>} />
+                  <Route path="/pagos" element={<ProtectedRoute requiredPermission="pagos"><Pagos /></ProtectedRoute>} />
+                  <Route path="/configuracion" element={<ProtectedRoute requiredPermission="configuracion"><Configuracion /></ProtectedRoute>} />
+                  <Route path="/anuncios" element={<ProtectedRoute requiredPermission="anuncios"><Anuncios /></ProtectedRoute>} />
+                  
+                  {/* Admin Only */}
+                  <Route path="/empleados" element={
+                      <ProtectedRoute>
+                          {/* We can enforce admin role inside component or here if we had a specific prop, 
+                              but ProtectedRoute logic handles admin bypass. 
+                              However, we want ONLY admin for this, not just any permission.
+                              Let's assume only Admin can access if we don't give "empleados" permission to anyone else.
+                              Or we can check role explicitly.
+                          */}
+                          {userRole === 'admin' ? <Empleados /> : <Navigate to="/" />}
+                      </ProtectedRoute>
+                  } />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

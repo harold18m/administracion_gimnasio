@@ -68,11 +68,55 @@ const sidebarSections: { label: string; items: SidebarItem[] }[] = [
 ];
 
 import { useGymSettings } from '@/hooks/useGymSettings';
+import { useAuth } from "@/App";
 
 export function GymSidebar() {
   const { pathname } = useLocation();
   const { state } = useSidebar();
   const { logoUrl } = useGymSettings();
+  const { userRole, permissions } = useAuth();
+
+  // Filter sections based on permissions
+  const filteredSections = sidebarSections.map(section => {
+    const filteredItems = section.items.filter(item => {
+      // Admin sees everything
+      if (userRole === 'admin') return true;
+      
+      // Map href to permission key
+      // This mapping needs to match the keys in Empleados.tsx and App.tsx
+      let permissionKey = '';
+      if (item.href === '/') permissionKey = 'dashboard';
+      else if (item.href === '/perfil') permissionKey = 'perfil';
+      else if (item.href === '/asistencia') permissionKey = 'asistencia';
+      else if (item.href === '/clientes') permissionKey = 'clientes';
+      else if (item.href === '/rutinas') permissionKey = 'rutinas';
+      else if (item.href === '/membresias') permissionKey = 'membresias';
+      else if (item.href === '/pagos') permissionKey = 'pagos';
+      else if (item.href === '/calendario') permissionKey = 'calendario';
+      else if (item.href === '/configuracion') permissionKey = 'configuracion';
+      else if (item.href === '/anuncios') permissionKey = 'anuncios';
+      
+      return permissions.includes(permissionKey);
+    });
+    
+    return { ...section, items: filteredItems };
+  }).filter(section => section.items.length > 0);
+
+  // Add Empleados link for Admin
+  if (userRole === 'admin') {
+      const configSection = filteredSections.find(s => s.label === 'Config');
+      if (configSection) {
+          // Check if already exists to avoid dupes if re-rendering (though map creates new objects)
+          if (!configSection.items.find(i => i.href === '/empleados')) {
+             configSection.items.push({ icon: Users, label: 'Empleados', href: '/empleados' });
+          }
+      } else {
+          filteredSections.push({
+              label: 'Config',
+              items: [{ icon: Users, label: 'Empleados', href: '/empleados' }]
+          });
+      }
+  }
 
   return (
     <Sidebar className="border-r" variant="sidebar" collapsible="icon" data-testid="sidebar">
@@ -87,7 +131,7 @@ export function GymSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="p-3 md:p-4">
-        {sidebarSections.map((section, idx) => (
+        {filteredSections.map((section, idx) => (
           <SidebarGroup key={section.label}>
             <SidebarGroupLabel className="text-xs tracking-wide uppercase text-sidebar-foreground/60">
               {section.label}
@@ -112,7 +156,7 @@ export function GymSidebar() {
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
-            {idx < sidebarSections.length - 1 && (
+            {idx < filteredSections.length - 1 && (
               <SidebarSeparator />
             )}
           </SidebarGroup>
