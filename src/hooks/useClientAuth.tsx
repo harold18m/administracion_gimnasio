@@ -3,7 +3,11 @@ import { supabase } from "@/lib/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase";
 
-type ClienteRow = Database['public']['Tables']['clientes']['Row'];
+type ClienteRow = Database['public']['Tables']['clientes']['Row'] & {
+  membresia?: {
+    caracteristicas: string[] | null
+  } | null
+};
 
 interface ClientAuthContextType {
   session: Session | null;
@@ -60,7 +64,7 @@ export const ClientAuthProvider = ({ children }: { children: React.ReactNode }) 
     try {
       const { data, error } = await supabase
         .from("clientes")
-        .select("*")
+        .select("*, membresia:membresias(caracteristicas)")
         .eq("email", email)
         .single();
       

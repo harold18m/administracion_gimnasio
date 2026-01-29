@@ -391,7 +391,7 @@ export default function ClientRutina() {
         )}
         </div>
 
-        <div className="fixed bottom-10 left-4 w-40 z-50 pointer-events-none opacity-100 filter drop-shadow-lg">
+        <div className="fixed bottom-10 left-4 w-32 z-50 pointer-events-none opacity-100 filter drop-shadow-lg">
             <img 
                 src="/images/erizo_rutina.webp" 
                 alt="Erizo Motivador" 

@@ -31,7 +31,7 @@ const Membresias = () => {
   const [nuevaMembresia, setNuevaMembresia] = useState<Partial<MembresiaInsert>>({
     nombre: '',
     descripcion: '',
-    tipo: 'mensual',
+    tipo: 'mensual' as 'mensual' | 'trimestral' | 'anual',
     modalidad: 'diario',
     precio: 0,
     duracion: 1,
@@ -46,7 +46,8 @@ const Membresias = () => {
 
   const tiposMembresia = [
     { value: 'mensual', label: 'Mensual', icon: CreditCard, color: 'bg-purple-100 text-purple-800' },
-    { value: 'trimestral', label: 'Trimestral', icon: Star, color: 'bg-orange-100 text-orange-800' }
+    { value: 'trimestral', label: 'Trimestral', icon: Star, color: 'bg-orange-100 text-orange-800' },
+    { value: 'anual', label: 'Anual', icon: Star, color: 'bg-yellow-100 text-yellow-800' }
   ];
 
   const modalidadesAcceso = [
@@ -149,6 +150,8 @@ const Membresias = () => {
         return 'mes(es)';
       case 'trimestral':
         return 'trimestre(s)';
+      case 'anual':
+        return 'año(s)';
       default:
         return 'período(s)';
     }
@@ -203,7 +206,7 @@ const Membresias = () => {
                   <Label htmlFor="tipo" className="text-sm">Tipo de Membresía</Label>
                   <Select 
                     value={nuevaMembresia.tipo} 
-                    onValueChange={(value) => setNuevaMembresia({...nuevaMembresia, tipo: value as 'mensual' | 'trimestral'})}
+                    onValueChange={(value) => setNuevaMembresia({...nuevaMembresia, tipo: value as 'mensual' | 'trimestral' | 'anual'})}
                   >
                     <SelectTrigger className="text-sm">
                       <SelectValue placeholder="Seleccionar tipo" />

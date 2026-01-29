@@ -124,6 +124,15 @@ export default function ClientHome() {
             <div>
               <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tu Membresía</CardDescription>
               <CardTitle className="text-xl mt-1">{cliente.nombre_membresia || "Sin Membresía"}</CardTitle>
+              {cliente.membresia?.caracteristicas && cliente.membresia.caracteristicas.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {cliente.membresia.caracteristicas.map((c, i) => (
+                    <span key={i} className="text-[15px] bg-secondary px-1.5 py-0.5 rounded-md text-secondary-foreground">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${
               esActivo ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -176,7 +185,7 @@ export default function ClientHome() {
         <ClientCalendarWidget />
       </div>
 
-      <div className="fixed bottom-10 right-4 w-40 z-0 pointer-events-none opacity-100 filter drop-shadow-lg">
+      <div className="fixed bottom-10 right-4 w-32 z-0 pointer-events-none opacity-100 filter drop-shadow-lg">
           <img 
               src="/images/erizo_inicio.webp" 
               alt="Erizo Saludo" 
