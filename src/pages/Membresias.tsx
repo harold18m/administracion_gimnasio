@@ -144,6 +144,12 @@ const Membresias = () => {
     }
   };
 
+  const handleNuevaMembresia = () => {
+    setEditando(null);
+    resetForm();
+    setDialogoAbierto(true);
+  };
+
   const obtenerUnidadDuracion = (tipo: string) => {
     switch (tipo) {
       case 'mensual':
@@ -174,7 +180,10 @@ const Membresias = () => {
         
         <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2 w-full sm:w-auto">
+            <Button 
+              className="flex items-center gap-2 w-full sm:w-auto"
+              onClick={handleNuevaMembresia}
+            >
               <Plus className="h-4 w-4" />
               Nueva Membresía
             </Button>
