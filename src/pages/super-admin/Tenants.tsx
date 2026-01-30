@@ -188,15 +188,20 @@ export default function TenantsPage() {
   };
 
   const nextStep = () => {
-      // Basic validation check could go here if using refs or state for fields, 
-      // but for simplicity with uncontrolled inputs, we'll rely on browser validation 
-      // by triggering a reportValidity check if possible, or just strict "required".
-      // Since it's uncontrolled, let's just move next. 
-      // Ideally we check if form is valid.
-      const form = document.querySelector('form.tenant-form') as HTMLFormElement;
-      if (form) {
-          if (!form.reportValidity()) return; 
+      // Validate only Step 1 fields
+      const nameInput = document.getElementById('name') as HTMLInputElement;
+      const slugInput = document.getElementById('slug') as HTMLInputElement;
+      
+      if (nameInput && !nameInput.checkValidity()) {
+          nameInput.reportValidity();
+          return;
       }
+      
+      if (slugInput && !slugInput.checkValidity()) {
+          slugInput.reportValidity();
+          return;
+      }
+
       setStep(2);
   };
 
