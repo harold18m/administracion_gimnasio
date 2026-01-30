@@ -174,20 +174,43 @@ export default function TenantsPage() {
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
+  const [duration, setDuration] = useState(1);
+  const [expiryDate, setExpiryDate] = useState('');
+
+  const calculateExpiryDate = (months: number) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() + Number(months));
+      return date.toISOString().split('T')[0];
+  };
 
   const openEdit = (tenant: Tenant) => {
       setEditingTenant(tenant);
       setStep(1);
+      // For editing, we don't necessarily reset duration to 1, but we rely on existing date
+      setExpiryDate(tenant.plan_expires_at ? new Date(tenant.plan_expires_at).toISOString().split('T')[0] : '');
+      setDuration(1); // Default reset
       setOpen(true);
   };
 
   const openNew = () => {
       setEditingTenant(null);
       setStep(1);
+      setDuration(1);
+      setExpiryDate(calculateExpiryDate(1));
       setOpen(true);
   };
 
-  const nextStep = () => {
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const months = parseInt(e.target.value);
+      setDuration(months);
+      if (!isNaN(months) && months > 0) {
+          setExpiryDate(calculateExpiryDate(months));
+      }
+  };
+
+  const nextStep = (e?: React.MouseEvent) => {
+      if (e) e.preventDefault();
+      
       // Validate only Step 1 fields
       const nameInput = document.getElementById('name') as HTMLInputElement;
       const slugInput = document.getElementById('slug') as HTMLInputElement;
@@ -203,6 +226,43 @@ export default function TenantsPage() {
       }
 
       setStep(2);
+  };
+
+  const [suspendDialog, setSuspendDialog] = useState<{open: boolean, tenant: Tenant | null, action: 'enable' | 'disable'}>({ open: false, tenant: null, action: 'disable' });
+  const [confirmationText, setConfirmationText] = useState('');
+
+  const openSuspendDialog = (tenant: Tenant) => {
+      const action = tenant.status === 'suspended' ? 'enable' : 'disable';
+      setSuspendDialog({ open: true, tenant, action });
+      setConfirmationText('');
+  };
+
+  const handleToggleStatus = async () => {
+      if (!suspendDialog.tenant) return;
+      const { tenant, action } = suspendDialog;
+      
+      const expectedText = action === 'enable' ? 'habilitar' : 'deshabilitar';
+      if (confirmationText.toLowerCase() !== expectedText) {
+          toast({ variant: "destructive", title: "Error", description: `Debes escribir "${expectedText}" para confirmar.` });
+          return;
+      }
+
+      try {
+          const newStatus = action === 'enable' ? 'active' : 'suspended';
+          const { error } = await supabase
+              .from('tenants')
+              .update({ status: newStatus })
+              .eq('id', tenant.id);
+
+          if (error) throw error;
+
+          fetchTenants();
+          setSuspendDialog({ open: false, tenant: null, action: 'disable' });
+          toast({ title: "Éxito", description: `Gimnasio ${action === 'enable' ? 'habilitado' : 'deshabilitado'} correctamente.` });
+      } catch (error) {
+          console.error("Error updating status:", error);
+          toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado." });
+      }
   };
 
   return (
@@ -243,7 +303,15 @@ export default function TenantsPage() {
                     </DialogDescription>
                 </DialogHeader>
                 
-                <form onSubmit={editingTenant ? handleUpdateTenant : handleCreateTenant} className="space-y-6 tenant-form">
+                <form 
+                    onSubmit={editingTenant ? handleUpdateTenant : handleCreateTenant} 
+                    className="space-y-6 tenant-form"
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" && step === 1) {
+                            e.preventDefault();
+                        }
+                    }}
+                >
                     
                     {/* STEP 1: INFORMACIÓN BÁSICA */}
                     <div className={step === 1 ? "space-y-4 animate-in fade-in slide-in-from-right-4 duration-300" : "hidden"}>
@@ -321,13 +389,30 @@ export default function TenantsPage() {
                         </div>
 
                         <div className="space-y-2">
+                            <Label htmlFor="duration" className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Duración (Meses)</Label>
+                            <Input 
+                                type="number" 
+                                id="duration" 
+                                min="1"
+                                max="100"
+                                value={duration}
+                                onChange={handleDurationChange}
+                                placeholder="Ej. 1" 
+                            />
+                            <p className="text-[0.8rem] text-muted-foreground">
+                                Se sumará a la fecha actual.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="plan_expires_at" className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Vencimiento del Plan</Label>
                             <Input 
                                 type="date" 
                                 id="plan_expires_at" 
                                 name="plan_expires_at" 
                                 required
-                                defaultValue={editingTenant?.plan_expires_at ? new Date(editingTenant.plan_expires_at).toISOString().split('T')[0] : ''} 
+                                value={expiryDate}
+                                onChange={(e) => setExpiryDate(e.target.value)}
                             />
                             <p className="text-[0.8rem] text-muted-foreground flex items-center gap-1">
                                 <CheckCircle2 className="h-3 w-3 text-green-500" /> El servicio se suspenderá automáticamente tras esta fecha.
@@ -337,7 +422,7 @@ export default function TenantsPage() {
                         <div className="p-4 bg-muted/30 rounded-lg border border-dashed border-primary/20">
                             <h4 className="text-sm font-medium text-primary mb-1">Resumen</h4>
                             <p className="text-xs text-muted-foreground">
-                                Estás asignando el plan seleccionado a este gimnasio. Asegúrate de verificar la fecha de corte.
+                                Estás asignando el plan seleccionado por <strong>{duration} mes(es)</strong>.
                             </p>
                         </div>
                     </div>
@@ -396,8 +481,11 @@ export default function TenantsPage() {
               </TableRow>
             ) : (
               tenants.map((tenant) => (
-                <TableRow key={tenant.id}>
-                  <TableCell className="font-medium">{tenant.name}</TableCell>
+                <TableRow key={tenant.id} className={tenant.status === 'suspended' ? 'bg-muted/50 opacity-70' : ''}>
+                  <TableCell className="font-medium">
+                      {tenant.name}
+                      {tenant.status === 'suspended' && <span className="ml-2 text-xs text-red-500 font-bold">(Suspendido)</span>}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                         <span className="font-medium">{tenant.slug}</span>
@@ -417,20 +505,33 @@ export default function TenantsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className="bg-green-500 hover:bg-green-600">Activo</Badge>
+                    <Badge className={tenant.status === 'suspended' ? "bg-red-500" : "bg-green-500 hover:bg-green-600"}>
+                        {tenant.status === 'suspended' ? 'Suspendido' : 'Activo'}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => generateInvitation(tenant.id)}>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Invitar Owner
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(tenant)}>
-                        <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={async () => {
-                        await switchTenant(tenant.id);
-                        navigate("/");
-                    }}>Gestionar</Button>
+                    <div className="flex justify-end gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className={tenant.status === 'suspended' ? "text-green-600 border-green-200 hover:bg-green-50" : "text-red-600 border-red-200 hover:bg-red-50"}
+                            onClick={() => openSuspendDialog(tenant)}
+                        >
+                            {tenant.status === 'suspended' ? 'Habilitar' : 'Suspender'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => generateInvitation(tenant.id)}>
+                            <UserPlus className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(tenant)}>
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                            await switchTenant(tenant.id);
+                            navigate("/");
+                        }}>
+                            <ArrowRight className="h-4 w-4" />
+                        </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -455,6 +556,40 @@ export default function TenantsPage() {
             </div>
             <DialogFooter className="mt-4">
                 <Button onClick={() => setIsInviteOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Suspend Confirmation Dialog */}
+      <Dialog open={suspendDialog.open} onOpenChange={(open) => !open && setSuspendDialog(prev => ({ ...prev, open: false }))}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle className={suspendDialog.action === 'enable' ? "text-green-600" : "text-destructive"}>
+                    {suspendDialog.action === 'enable' ? "Habilitar Gimnasio" : "Suspender Gimnasio"}
+                </DialogTitle>
+                <DialogDescription>
+                    Esta acción {suspendDialog.action === 'enable' ? "permitirá" : "bloqueará"} el acceso al sistema para <strong>{suspendDialog.tenant?.name}</strong>.
+                    <br/><br/>
+                    Para confirmar, escribe <strong>{suspendDialog.action === 'enable' ? "habilitar" : "deshabilitar"}</strong> abajo.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <Input 
+                    placeholder={suspendDialog.action === 'enable' ? "habilitar" : "deshabilitar"}
+                    value={confirmationText}
+                    onChange={(e) => setConfirmationText(e.target.value)}
+                    className="border-primary"
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setSuspendDialog(prev => ({ ...prev, open: false }))}>Cancelar</Button>
+                <Button 
+                    variant={suspendDialog.action === 'enable' ? "default" : "destructive"}
+                    onClick={handleToggleStatus}
+                    disabled={confirmationText.toLowerCase() !== (suspendDialog.action === 'enable' ? 'habilitar' : 'deshabilitar')}
+                >
+                    Confirmar
+                </Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
