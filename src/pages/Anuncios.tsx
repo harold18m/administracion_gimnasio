@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Megaphone, Save, Eye, PanelLeft, PanelRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useTenant } from "@/context/TenantContext";
 
 interface AnuncioConfig {
   id?: string;
@@ -81,7 +82,10 @@ export default function Anuncios() {
     cargarAnuncios();
   }, []);
 
+  const { tenant } = useTenant();
+
   const guardarAnuncio = async (anuncio: AnuncioConfig) => {
+    if (!tenant) return;
     setSaving(true);
     try {
       const { error } = await supabase
@@ -89,14 +93,15 @@ export default function Anuncios() {
         .upsert({
           id: anuncio.id,
           posicion: anuncio.posicion,
-          tipo: 'texto', // Legacy field required by DB constraint
+          tenant_id: tenant.id, // Explicitly set tenant_id
+          tipo: 'texto',
           contenido: anuncio.contenido,
           url_imagen: anuncio.url_imagen,
           titulo: anuncio.titulo,
           activo: anuncio.activo,
           color_fondo: anuncio.color_fondo,
           color_texto: anuncio.color_texto
-        }, { onConflict: 'posicion' });
+        }, { onConflict: 'tenant_id, posicion' }); // Updated constraint check
 
       if (error) throw error;
 

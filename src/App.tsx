@@ -21,9 +21,18 @@ const Anuncios = lazy(() => import("./pages/Anuncios"));
 const Perfil = lazy(() => import("./pages/Perfil"));
 const Empleados = lazy(() => import("./pages/Empleados"));
 
+// Lazy load Super Admin Pages
+const SuperAdminLayout = lazy(() => import("./pages/super-admin/Layout").then(module => ({ default: module.SuperAdminLayout })));
+const SuperAdminDashboard = lazy(() => import("./pages/super-admin/Dashboard"));
+const Tenants = lazy(() => import("./pages/super-admin/Tenants"));
+const Plans = lazy(() => import("./pages/super-admin/Plans"));
+const CrmLeads = lazy(() => import("./pages/super-admin/crm/Leads"));
+
 // Lazy load Auth Pages
 const Login = lazy(() => import("./pages/Login"));
 const Registro = lazy(() => import("./pages/Registro"));
+const RecuperarPassword = lazy(() => import("./pages/RecuperarPassword"));
+const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 const Kiosko = lazy(() => import("./pages/Kiosko"));
 
 // Lazy load Client Pages
@@ -108,6 +117,7 @@ const LoadingFallback = () => (
 );
 
 import { useGymSettings } from "./hooks/useGymSettings";
+import { TenantProvider } from "./context/TenantContext";
 
 const App = () => {
   useGymSettings(); // Initialize global settings (theme, logo)
@@ -174,6 +184,7 @@ const App = () => {
   return (
     <AuthContext.Provider value={{ isAuthenticated, userEmail, userRole, permissions, login, logout }}>
       <ClientAuthProvider>
+      <TenantProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
@@ -184,6 +195,8 @@ const App = () => {
                 {/* Rutas Públicas */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/registro" element={<Registro />} />
+                <Route path="/recuperar-password" element={<RecuperarPassword />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/kiosko" element={<Kiosko />} />
 
                 {/* Rutas App Clientes */}
@@ -202,37 +215,47 @@ const App = () => {
                   <Route path="perfil" element={<ClientPerfil />} />
                 </Route>
 
-                {/* Rutas Protegidas Administrativas */}
-                <Route element={
-                  <ProtectedRoute>
-                    <GymLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route path="/" element={<ProtectedRoute requiredPermission="dashboard"><Dashboard /></ProtectedRoute>} />
-                  <Route path="/asistencia" element={<ProtectedRoute requiredPermission="asistencia"><Asistencia /></ProtectedRoute>} />
-                  <Route path="/clientes" element={<ProtectedRoute requiredPermission="clientes"><Clientes /></ProtectedRoute>} />
-                  <Route path="/membresias" element={<ProtectedRoute requiredPermission="membresias"><Membresias /></ProtectedRoute>} />
-                  <Route path="/perfil" element={<ProtectedRoute requiredPermission="perfil"><Perfil /></ProtectedRoute>} />
-                  <Route path="/ejercicios" element={<ProtectedRoute requiredPermission="rutinas"><Rutinas /></ProtectedRoute>} />
-                  <Route path="/rutinas" element={<ProtectedRoute requiredPermission="rutinas"><Rutinas /></ProtectedRoute>} />
-                  <Route path="/calendario" element={<ProtectedRoute requiredPermission="calendario"><Calendario /></ProtectedRoute>} />
-                  <Route path="/pagos" element={<ProtectedRoute requiredPermission="pagos"><Pagos /></ProtectedRoute>} />
-                  <Route path="/configuracion" element={<ProtectedRoute requiredPermission="configuracion"><Configuracion /></ProtectedRoute>} />
-                  <Route path="/anuncios" element={<ProtectedRoute requiredPermission="anuncios"><Anuncios /></ProtectedRoute>} />
-                  
-                  {/* Admin Only */}
-                  <Route path="/empleados" element={
-                      <ProtectedRoute>
-                          {/* We can enforce admin role inside component or here if we had a specific prop, 
-                              but ProtectedRoute logic handles admin bypass. 
-                              However, we want ONLY admin for this, not just any permission.
-                              Let's assume only Admin can access if we don't give "empleados" permission to anyone else.
-                              Or we can check role explicitly.
-                          */}
-                          {userRole === 'admin' ? <Empleados /> : <Navigate to="/" />}
-                      </ProtectedRoute>
-                  } />
-                </Route>
+                  {/* Super Admin Routes - Isolated from GymLayout */}
+                  <Route path="/super-admin" element={
+                     <ProtectedRoute>
+                        {/* We should check for specific super_admin role, but for now we assume admin or check permissions later */}
+                        <Suspense fallback={<LoadingFallback />}>
+                           { import.meta.env.VITE_SUPER_ADMIN_MODE === 'true' || userRole === 'admin' ? (
+                               <SuperAdminLayout />
+                           ) : <Navigate to="/" /> }
+                        </Suspense>
+                     </ProtectedRoute>
+                  }>
+                      <Route index element={<SuperAdminDashboard />} />
+                      <Route path="tenants" element={<Tenants />} />
+                      <Route path="plans" element={<Plans />} />
+                      <Route path="crm" element={<CrmLeads />} />
+                  </Route>
+
+                  {/* Rutas Protegidas Administrativas (Gym Owner) */}
+                  <Route element={
+                    <ProtectedRoute>
+                      <GymLayout />
+                    </ProtectedRoute>
+                  }>
+                    <Route path="/" element={<ProtectedRoute requiredPermission="dashboard"><Dashboard /></ProtectedRoute>} />
+                    <Route path="/asistencia" element={<ProtectedRoute requiredPermission="asistencia"><Asistencia /></ProtectedRoute>} />
+                    <Route path="/clientes" element={<ProtectedRoute requiredPermission="clientes"><Clientes /></ProtectedRoute>} />
+                    <Route path="/membresias" element={<ProtectedRoute requiredPermission="membresias"><Membresias /></ProtectedRoute>} />
+                    <Route path="/perfil" element={<ProtectedRoute requiredPermission="perfil"><Perfil /></ProtectedRoute>} />
+                    <Route path="/ejercicios" element={<ProtectedRoute requiredPermission="rutinas"><Rutinas /></ProtectedRoute>} />
+                    <Route path="/rutinas" element={<ProtectedRoute requiredPermission="rutinas"><Rutinas /></ProtectedRoute>} />
+                    <Route path="/calendario" element={<ProtectedRoute requiredPermission="calendario"><Calendario /></ProtectedRoute>} />
+                    <Route path="/pagos" element={<ProtectedRoute requiredPermission="pagos"><Pagos /></ProtectedRoute>} />
+                    <Route path="/configuracion" element={<ProtectedRoute requiredPermission="configuracion"><Configuracion /></ProtectedRoute>} />
+                    <Route path="/anuncios" element={<ProtectedRoute requiredPermission="anuncios"><Anuncios /></ProtectedRoute>} />
+                    
+                    <Route path="/empleados" element={
+                        <ProtectedRoute>
+                            {userRole === 'admin' ? <Empleados /> : <Navigate to="/" />}
+                        </ProtectedRoute>
+                    } />
+                  </Route>
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -240,6 +263,7 @@ const App = () => {
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
+      </TenantProvider>
       </ClientAuthProvider>
     </AuthContext.Provider>
   );

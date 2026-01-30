@@ -36,26 +36,52 @@ export default function Login() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // 1. Check Admin
+      // 1. Try Supabase Auth Login (for SaaS Users/Admins)
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (!authError && authData.user) {
+         // Fetch role from user_roles
+         const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role, tenant_id')
+            .eq('user_id', authData.user.id)
+            .maybeSingle(); 
+
+         if (roleData) {
+             const role = roleData.role as any;
+             
+             // Check if super_admin
+             if (role === 'super_admin') {
+                 login(values.email, 'admin', ['super_admin']); 
+                 navigate("/super-admin");
+                 return;
+             }
+             
+             // For gym owners/admins
+             login(values.email, 'admin', []); 
+             navigate("/");
+             return;
+         }
+      }
+
+      // 2. Legacy Admin Check (Fallback)
       if (values.email === "admin@fitgym.com") {
-         // Admin Login (Mocked for now as per original code, or we could verify password if we had one)
-         // Assuming admin password check is skipped or handled elsewhere, but original code just checked email.
-         // Let's keep original behavior for admin but maybe add a dummy password check if needed.
-         // Original code: if (values.email !== "admin@fitgym.com") ...
-         
-         // We'll just proceed as admin
+         // ... existing legacy admin logic ...
          login(values.email, 'admin', []);
-         toast({ title: "Inicio de sesión exitoso", description: "Bienvenido, Administrador." });
+         toast({ title: "Inicio de sesión exitoso", description: "Bienvenido, Administrador (Legacy)." });
          navigate("/");
          return;
       }
 
-      // 2. Check Employee
+      // 3. Legacy Employee Check (Fallback)
       const { data, error } = await supabase
         .from('empleados')
         .select('*')
         .eq('email', values.email)
-        .eq('password', values.password) // Plain text for now as per plan
+        .eq('password', values.password) 
         .single();
 
       if (error || !data) {
@@ -110,7 +136,15 @@ export default function Login() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contraseña</FormLabel>
+                    <div className="flex items-center justify-between">
+                        <FormLabel>Contraseña</FormLabel>
+                        <Link 
+                            to="/recuperar-password" 
+                            className="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                        >
+                            ¿Olvidaste tu contraseña?
+                        </Link>
+                    </div>
                     <FormControl>
                       <Input type="password" placeholder="******" {...field} />
                     </FormControl>

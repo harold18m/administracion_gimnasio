@@ -1,6 +1,5 @@
-
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +7,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
@@ -25,6 +25,8 @@ export default function Registro() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,27 +41,59 @@ export default function Registro() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // Aquí se implementaría el registro real con Supabase o Firebase
-      console.log("Registro data:", values);
-      
-      // Simulación de registro exitoso
-      setTimeout(() => {
-        setIsLoading(false);
+      // 1. SignUp
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+            data: {
+                full_name: values.nombre,
+            }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // 2. Claim Invitation if token exists
+      if (token) {
+        const { error: claimError } = await supabase.rpc('claim_invitation', { token_input: token });
+        if (claimError) {
+             console.error("Error claiming invitation:", claimError);
+             toast({
+                variant: "destructive",
+                title: "Advertencia",
+                description: "Cuenta creada, pero hubo un error al vincular el gimnasio. Contacta soporte.",
+             });
+        } else {
+             toast({
+                title: "¡Bienvenido Owner!",
+                description: "Tu gimnasio ha sido vinculado exitosamente.",
+             });
+        }
+      } else {
         toast({
           title: "Registro exitoso",
-          description: "Ya puedes iniciar sesión",
+          description: "Por favor verifica tu correo (si está configurado) o inicia sesión.",
         });
-        navigate("/login");
-      }, 1000);
-    } catch (error) {
+      }
+
+      navigate("/login");
+      
+    } catch (error: any) {
       setIsLoading(false);
+      console.error("Registration error:", error);
       toast({
         variant: "destructive",
         title: "Error al registrarse",
-        description: "Por favor, intenta de nuevo más tarde",
+        description: error.message || "Por favor, intenta de nuevo más tarde",
       });
+    } finally {
+        setIsLoading(false);
     }
   }
+
+  // If no token, maybe we want to disable registration? Or leave it open?
+  // For now, allow registration but show special message if token exists.
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black p-4">
@@ -69,9 +103,13 @@ export default function Registro() {
             <Dumbbell className="h-8 w-8 text-primary mr-2" />
             <h2 className="text-3xl font-bold">FitGym</h2>
           </div>
-          <CardTitle className="text-2xl text-center">Crear cuenta</CardTitle>
+          <CardTitle className="text-2xl text-center">
+            {token ? "Activar Cuenta de Gimnasio" : "Crear cuenta"}
+          </CardTitle>
           <CardDescription className="text-center">
-            Ingresa tus datos para registrarte en el sistema
+            {token 
+                ? "Regístrate para tomar control de tu gimnasio." 
+                : "Ingresa tus datos para registrarte en el sistema"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -129,8 +167,18 @@ export default function Registro() {
                   </FormItem>
                 )}
               />
+              
+              {token && (
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-md flex items-start gap-3">
+                      <ArrowRight className="h-5 w-5 text-indigo-500 mt-0.5" />
+                      <div className="text-sm text-indigo-700 font-medium">
+                          Estás a un paso de activar tu panel de administración.
+                      </div>
+                  </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Registrando..." : "Registrarse"}
+                {isLoading ? "Registrando..." : (token ? "Activar Gimnasio" : "Registrarse")}
               </Button>
             </form>
           </Form>

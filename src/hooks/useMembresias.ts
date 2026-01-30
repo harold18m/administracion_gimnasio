@@ -7,16 +7,20 @@ type Membresia = Database['public']['Tables']['membresias']['Row'];
 type MembresiaInsert = Database['public']['Tables']['membresias']['Insert'];
 type MembresiaUpdate = Database['public']['Tables']['membresias']['Update'];
 
+import { useTenant } from '@/context/TenantContext';
+
 export const useMembresias = () => {
   const [membresias, setMembresias] = useState<Membresia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   // Cargar membresías desde Supabase
   const fetchMembresias = async () => {
     try {
       setLoading(true);
+      // RLS will filter by tenant automatically
       const { data, error } = await supabase
         .from('membresias')
         .select('*')
@@ -42,9 +46,11 @@ export const useMembresias = () => {
   // Crear nueva membresía
   const crearMembresia = async (membresia: MembresiaInsert) => {
     try {
+      if (!tenant?.id) throw new Error("No tenant selected");
+
       const { data, error } = await supabase
         .from('membresias')
-        .insert([membresia])
+        .insert([{ ...membresia, tenant_id: tenant.id }])
         .select()
         .single();
 
