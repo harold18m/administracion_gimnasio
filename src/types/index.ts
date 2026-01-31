@@ -6,6 +6,7 @@ export interface Tenant {
   pais?: string;
   ciudad?: string;
   telefono?: string;
+  status?: 'active' | 'suspended';
   plan_expires_at?: string;
   created_at: string;
   updated_at: string;

@@ -176,6 +176,8 @@ export default function TenantsPage() {
   const [step, setStep] = useState(1);
   const [duration, setDuration] = useState(1);
   const [expiryDate, setExpiryDate] = useState('');
+  const [suspendDialog, setSuspendDialog] = useState<{open: boolean, tenant: Tenant | null, action: 'enable' | 'disable'}>({ open: false, tenant: null, action: 'disable' });
+  const [confirmationText, setConfirmationText] = useState('');
 
   const calculateExpiryDate = (months: number) => {
       const date = new Date();
@@ -228,8 +230,7 @@ export default function TenantsPage() {
       setStep(2);
   };
 
-  const [suspendDialog, setSuspendDialog] = useState<{open: boolean, tenant: Tenant | null, action: 'enable' | 'disable'}>({ open: false, tenant: null, action: 'disable' });
-  const [confirmationText, setConfirmationText] = useState('');
+
 
   const openSuspendDialog = (tenant: Tenant) => {
       const action = tenant.status === 'suspended' ? 'enable' : 'disable';
@@ -264,6 +265,8 @@ export default function TenantsPage() {
           toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado." });
       }
   };
+
+
 
   return (
     <div className="space-y-6">
@@ -540,26 +543,6 @@ export default function TenantsPage() {
         </Table>
       </div>
 
-      <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Invitación Generada</DialogTitle>
-                <DialogDescription>
-                    Comparte este enlace con el dueño del gimnasio para que complete su registro.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="flex items-center space-x-2 mt-4">
-                <Input value={inviteLink || ''} readOnly />
-                <Button size="icon" onClick={copyToClipboard}>
-                    <Clipboard className="h-4 w-4" />
-                </Button>
-            </div>
-            <DialogFooter className="mt-4">
-                <Button onClick={() => setIsInviteOpen(false)}>Cerrar</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
       {/* Suspend Confirmation Dialog */}
       <Dialog open={suspendDialog.open} onOpenChange={(open) => !open && setSuspendDialog(prev => ({ ...prev, open: false }))}>
         <DialogContent>
@@ -593,6 +576,27 @@ export default function TenantsPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Invitación Generada</DialogTitle>
+                <DialogDescription>
+                    Comparte este enlace con el dueño del gimnasio para que complete su registro.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center space-x-2 mt-4">
+                <Input value={inviteLink || ''} readOnly />
+                <Button size="icon" onClick={copyToClipboard}>
+                    <Clipboard className="h-4 w-4" />
+                </Button>
+            </div>
+            <DialogFooter className="mt-4">
+                <Button onClick={() => setIsInviteOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+
     </div>
   );
 }

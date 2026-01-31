@@ -67,14 +67,7 @@ export default function Login() {
          }
       }
 
-      // 2. Legacy Admin Check (Fallback)
-      if (values.email === "admin@fitgym.com") {
-         // ... existing legacy admin logic ...
-         login(values.email, 'admin', []);
-         toast({ title: "Inicio de sesión exitoso", description: "Bienvenido, Administrador (Legacy)." });
-         navigate("/");
-         return;
-      }
+
 
       // 3. Legacy Employee Check (Fallback)
       const { data, error } = await supabase
