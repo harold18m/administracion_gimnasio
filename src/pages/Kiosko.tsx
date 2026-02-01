@@ -249,6 +249,7 @@ export default function Kiosko() {
       .from("asistencias")
       .insert({ 
         cliente_id: cliente.id, 
+        tenant_id: cliente.tenant_id,
         estado: "presente", 
         notas: "qr",
         fecha_asistencia: fechaActualISO 
@@ -353,7 +354,7 @@ export default function Kiosko() {
     // Buscar TODOS los clientes que tengan ese código QR (para detectar duplicados)
     const { data: clientesEncontrados, error } = await supabase
       .from("clientes")
-      .select("id, nombre, dni, estado, avatar_url, nombre_membresia, tipo_membresia, fecha_fin, membresia_id")
+      .select("id, nombre, dni, estado, avatar_url, nombre_membresia, tipo_membresia, fecha_fin, membresia_id, tenant_id")
       .eq("codigo_qr", valor);
 
     if (error) {

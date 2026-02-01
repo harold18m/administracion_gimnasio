@@ -13,7 +13,10 @@ import {
   User,
   UserCheck,
   Wallet,
-  Megaphone
+  Megaphone,
+  Package,
+  ShoppingCart,
+  History
 } from 'lucide-react';
 import {
   Sidebar,
@@ -56,6 +59,9 @@ const sidebarSections: { label: string; items: SidebarItem[] }[] = [
       { icon: CreditCard, label: 'Membresías', href: '/membresias' },
       { icon: Wallet, label: 'Pagos', href: '/pagos' },
       { icon: Calendar, label: 'Calendario', href: '/calendario' },
+      { icon: Package, label: 'Inventario', href: '/productos' },
+      { icon: ShoppingCart, label: 'Punto de Venta', href: '/pos' },
+      { icon: History, label: 'Historial Ventas', href: '/ventas' },
     ],
   },
   {
@@ -95,6 +101,9 @@ export function GymSidebar() {
       else if (item.href === '/calendario') permissionKey = 'calendario';
       else if (item.href === '/configuracion') permissionKey = 'configuracion';
       else if (item.href === '/anuncios') permissionKey = 'anuncios';
+      else if (item.href === '/productos') permissionKey = 'productos';
+      else if (item.href === '/pos') permissionKey = 'pos';
+      else if (item.href === '/ventas') permissionKey = 'ventas';
       
       return permissions.includes(permissionKey);
     });

@@ -65,7 +65,15 @@ export default function ClientRutina() {
         .or(`cliente_id.eq.${cliente!.id},cliente_id.is.null`)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      
+      // Sort: Personal routines (with cliente_id) first
+      return (data || []).sort((a, b) => {
+        const aIsPersonal = !!a.cliente_id;
+        const bIsPersonal = !!b.cliente_id;
+        if (aIsPersonal && !bIsPersonal) return -1;
+        if (!aIsPersonal && bIsPersonal) return 1;
+        return 0; // Keep original created_at order within groups
+      });
     },
     enabled: !!cliente?.id,
   });

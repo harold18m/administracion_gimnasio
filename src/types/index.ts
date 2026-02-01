@@ -56,3 +56,53 @@ export interface CrmLead {
     notes?: string;
     created_at: string;
 }
+
+export interface CategoriaProducto {
+    id: string;
+    tenant_id: string;
+    nombre: string;
+    created_at?: string;
+}
+
+export interface Producto {
+    id: string;
+    tenant_id: string;
+    categoria_id?: string | null;
+    categoria?: CategoriaProducto; // For joined queries
+    nombre: string;
+    descripcion?: string;
+    precio: number;
+    costo?: number;
+    stock_actual: number;
+    min_stock?: number;
+    imagen_url?: string;
+    codigo_barras?: string;
+    activo: boolean;
+    created_at?: string;
+}
+
+export interface Venta {
+    id: string;
+    tenant_id: string;
+    cliente_id?: string | null;
+    usuario_id?: string | null;
+    total: number;
+    metodo_pago: string;
+    estado: 'completada' | 'anulada';
+    fecha: string;
+    created_at?: string;
+    items?: DetalleVenta[]; // For UI convenience
+    cliente?: { nombre: string }; // For joined queries
+}
+
+export interface DetalleVenta {
+    id: string;
+    tenant_id: string;
+    venta_id: string;
+    producto_id?: string | null;
+    producto?: { nombre: string }; // For joined queries
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
+    created_at?: string;
+}

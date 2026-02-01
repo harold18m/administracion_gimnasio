@@ -89,90 +89,107 @@ export default function ClientPerfil() {
     }
   };
 
-  if (!cliente) return null;
+  // if (!cliente) return null; // Removed blocking check
 
   return (
     <div className="p-4 space-y-6 max-w-md mx-auto">
       <div className="text-center space-y-2">
-        <Dialog open={isUpdateOpen} onOpenChange={setIsUpdateOpen}>
-          <DialogTrigger asChild>
-            <div className="relative inline-block cursor-pointer group">
-                <Avatar className="h-24 w-24 mx-auto border-4 border-background shadow-lg transition-transform group-hover:scale-105">
-                <AvatarImage src={cliente.avatar_url || ""} />
-                <AvatarFallback className="text-2xl bg-primary/10 text-primary">
-                    {cliente.nombre.substring(0, 2).toUpperCase()}
+        {cliente ? (
+            <Dialog open={isUpdateOpen} onOpenChange={setIsUpdateOpen}>
+              <DialogTrigger asChild>
+                <div className="relative inline-block cursor-pointer group">
+                    <Avatar className="h-24 w-24 mx-auto border-4 border-background shadow-lg transition-transform group-hover:scale-105">
+                    <AvatarImage src={cliente.avatar_url || ""} />
+                    <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                        {cliente.nombre.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-md">
+                        <Camera className="h-4 w-4" />
+                    </div>
+                </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Cambiar Foto de Perfil</DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-4">
+                    {/* Section 1: Presets */}
+                    <div>
+                        <h3 className="text-sm font-medium mb-3 text-muted-foreground">Elegir un avatar</h3>
+                        <div className="grid grid-cols-4 gap-3">
+                            {PRESET_AVATARS.map((avatar, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleUpdateAvatar(avatar)}
+                                    disabled={updating}
+                                    className={`relative aspect-square rounded-full overflow-hidden border-2 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${cliente.avatar_url === avatar ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-transparent hover:border-muted-foreground/30'}`}
+                                >
+                                    <img src={avatar} alt={`Avatar ${i}`} className="w-full h-full object-cover" />
+                                    {cliente.avatar_url === avatar && (
+                                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                            <Check className="h-5 w-5 text-primary-foreground drop-shadow-md" />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">O sube tu foto</span>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Upload */}
+                    <div className="flex justify-center">
+                        <Button variant="outline" className="w-full relative" disabled={updating}>
+                            {updating ? (
+                                "Actualizando..."
+                            ) : (
+                                <>
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Subir desde galería
+                                </>
+                            )}
+                            <input 
+                                type="file" 
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                accept="image/*"
+                                onChange={handleFileUpload}
+                                disabled={updating}
+                            />
+                        </Button>
+                    </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+        ) : (
+            <div className="relative inline-block">
+                <Avatar className="h-24 w-24 mx-auto border-4 border-background shadow-lg">
+                <AvatarFallback className="text-2xl bg-muted text-muted-foreground">
+                    <User className="h-10 w-10" />
                 </AvatarFallback>
                 </Avatar>
-                <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-md">
-                    <Camera className="h-4 w-4" />
-                </div>
             </div>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Cambiar Foto de Perfil</DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-                {/* Section 1: Presets */}
-                <div>
-                    <h3 className="text-sm font-medium mb-3 text-muted-foreground">Elegir un avatar</h3>
-                    <div className="grid grid-cols-4 gap-3">
-                        {PRESET_AVATARS.map((avatar, i) => (
-                            <button
-                                key={i}
-                                onClick={() => handleUpdateAvatar(avatar)}
-                                disabled={updating}
-                                className={`relative aspect-square rounded-full overflow-hidden border-2 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${cliente.avatar_url === avatar ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-transparent hover:border-muted-foreground/30'}`}
-                            >
-                                <img src={avatar} alt={`Avatar ${i}`} className="w-full h-full object-cover" />
-                                {cliente.avatar_url === avatar && (
-                                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                        <Check className="h-5 w-5 text-primary-foreground drop-shadow-md" />
-                                    </div>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+        )}
 
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">O sube tu foto</span>
-                    </div>
-                </div>
-
-                {/* Section 2: Upload */}
-                <div className="flex justify-center">
-                    <Button variant="outline" className="w-full relative" disabled={updating}>
-                        {updating ? (
-                            "Actualizando..."
-                        ) : (
-                            <>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Subir desde galería
-                            </>
-                        )}
-                        <input 
-                            type="file" 
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            disabled={updating}
-                        />
-                    </Button>
-                </div>
+        <h1 className="text-xl font-bold">{cliente?.nombre || "Usuario"}</h1>
+        <p className="text-sm text-muted-foreground">{cliente?.email || user?.email}</p>
+        
+        {!cliente && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/10 text-yellow-800 dark:text-yellow-400 p-3 rounded-lg text-sm border border-yellow-200 dark:border-yellow-900/30 mt-4">
+                <p>Tu cuenta no está vinculada a ningún perfil de gimnasio activo.</p>
             </div>
-          </DialogContent>
-        </Dialog>
-
-        <h1 className="text-xl font-bold">{cliente.nombre}</h1>
-        <p className="text-sm text-muted-foreground">{cliente.email}</p>
+        )}
       </div>
 
+      {cliente && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Datos Personales</CardTitle>
@@ -203,6 +220,7 @@ export default function ClientPerfil() {
           )}
         </CardContent>
       </Card>
+      )}
 
       <Button variant="destructive" className="w-full" onClick={handleLogout}>
         <LogOut className="mr-2 h-4 w-4" />

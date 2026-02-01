@@ -20,6 +20,9 @@ const Pagos = lazy(() => import("./pages/Pagos"));
 const Anuncios = lazy(() => import("./pages/Anuncios"));
 const Perfil = lazy(() => import("./pages/Perfil"));
 const Empleados = lazy(() => import("./pages/Empleados"));
+const Productos = lazy(() => import("./pages/Productos"));
+const PuntoDeVenta = lazy(() => import("./pages/PuntoDeVenta"));
+const Ventas = lazy(() => import("./pages/Ventas"));
 
 // Lazy load Super Admin Pages
 const SuperAdminLayout = lazy(() => import("./pages/super-admin/Layout").then(module => ({ default: module.SuperAdminLayout })));
@@ -249,6 +252,9 @@ const App = () => {
                     <Route path="/pagos" element={<ProtectedRoute requiredPermission="pagos"><Pagos /></ProtectedRoute>} />
                     <Route path="/configuracion" element={<ProtectedRoute requiredPermission="configuracion"><Configuracion /></ProtectedRoute>} />
                     <Route path="/anuncios" element={<ProtectedRoute requiredPermission="anuncios"><Anuncios /></ProtectedRoute>} />
+                    <Route path="/productos" element={<ProtectedRoute requiredPermission="productos"><Productos /></ProtectedRoute>} />
+                    <Route path="/pos" element={<ProtectedRoute requiredPermission="pos"><PuntoDeVenta /></ProtectedRoute>} />
+                    <Route path="/ventas" element={<ProtectedRoute requiredPermission="ventas"><Ventas /></ProtectedRoute>} />
                     
                     <Route path="/empleados" element={
                         <ProtectedRoute>
