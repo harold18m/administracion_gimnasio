@@ -49,6 +49,7 @@ const ClientUpdatePassword = lazy(() => import("./pages/client/ClientUpdatePassw
 
 import NotFound from "./pages/NotFound";
 import { ClientAuthProvider, useClientAuth } from "./hooks/useClientAuth";
+import { ClientAuthListener } from "./components/ClientAuthListener";
 
 // Crear contexto de autenticación
 interface AuthContextType {
@@ -193,6 +194,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ClientAuthListener />
             <Suspense fallback={<LoadingFallback />}>
               <Routes>
                 {/* Rutas Públicas */}
