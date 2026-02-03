@@ -24,6 +24,7 @@ import { User2, Star, CalendarRange, QrCode, Wallet, CreditCard } from "lucide-r
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { useTenant } from "@/context/TenantContext";
 
 export const formSchema = z.object({
   nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
@@ -59,6 +60,7 @@ interface ClienteFormProps {
 }
 
 export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, membresiasDisponibles, saveCliente }: ClienteFormProps) {
+  const { tenant } = useTenant();
   const qrContainerRef = useRef<HTMLDivElement | null>(null);
   const [step, setStep] = useState<number>(0);
   const steps = [
@@ -180,9 +182,12 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
         // Si es un nuevo cliente y tiene membresía, crear el plan de pago
         if (!clienteActual && clienteCreado && membresiaSeleccionada) {
           // Crear registro de pago
+          if (!tenant) throw new Error("No se ha seleccionado una sede (tenant_id)");
+          
           const { data: pagoData, error: pagoError } = await supabase
             .from('pagos')
             .insert({
+              tenant_id: tenant.id,
               cliente_id: clienteCreado.id,
               membresia_id: membresiaSeleccionada.id,
               monto_total: precioMembresia,
@@ -204,6 +209,7 @@ export function ClienteForm({ isOpen, onOpenChange, onSubmit, clienteActual, mem
               await supabase
                 .from('transacciones')
                 .insert({
+                  tenant_id: tenant.id,
                   pago_id: pagoData.id,
                   cliente_id: clienteCreado.id,
                   monto: montoInicial,

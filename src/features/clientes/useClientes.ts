@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useMembresias } from "@/hooks/useMembresias";
+import { useTenant } from "@/context/TenantContext";
 import type { Database } from "@/lib/supabase";
 
 type Cliente = Database['public']['Tables']['clientes']['Row'];
@@ -20,6 +21,7 @@ export const useClientes = () => {
   const [clienteToDelete, setClienteToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const { getMembresiasPorSeleccion } = useMembresias();
+  const { tenant } = useTenant();
 
   // Cargar clientes desde Supabase
   const fetchClientes = async () => {
@@ -138,7 +140,7 @@ export const useClientes = () => {
 
       if (clienteActual) {
         // Editar cliente existente
-        const updateData: ClienteUpdate = {
+        const updateData: any = {
           nombre: values.nombre,
           email: values.email && values.email.trim().length > 0 ? values.email : null,
           telefono: values.telefono,
@@ -182,8 +184,11 @@ export const useClientes = () => {
 
         return data;
       } else {
+        if (!tenant) throw new Error("No se ha seleccionado una sede (tenant_id)");
+
         // Agregar nuevo cliente
-        const insertData: ClienteInsert = {
+        const insertData: any = {
+          tenant_id: tenant.id,
           nombre: values.nombre,
           email: values.email && values.email.trim().length > 0 ? values.email : null,
           telefono: values.telefono,
